@@ -11,12 +11,15 @@ import (
 	"strings"
 )
 
+const tfComplianceBin = "terraform-compliance"
+const featuresPath = "../terraform-compliance/example/example_01/aws/" // should use the same directory
+const planTmpFile = "./plan.out"                                       // the plan.out is created here to test, and deleted after that.
 const documentation = `
 This tool is used to manipulate the terraform-compliance tool
 and its state through a REST API to test terraform plan files,
 and edit the requirements as well.
 
-    USAGE:
+	USAGE:
 
  {program-name} --help       Show this
  {program-name} address      Start listening at address (example '0.0.0.0:80')
@@ -24,8 +27,8 @@ and edit the requirements as well.
 
 	API:
 
-POST /validate
-Validate a terraform plan file with the current features. The plan file
+POST /test
+Test a terraform plan file with the current features. The plan file
 is passed as a raw base64 string in the body.
 
 GET /features
@@ -63,7 +66,7 @@ func main() {
 	}
 
 	r := mux.NewRouter()
-	r.HandleFunc("/validate", ValidateReq).Methods("POST")
+	r.HandleFunc("/validate", ValidateReq).Methods("GET")
 	r.HandleFunc("/features", FeaturesReq).Methods("GET")
 	r.HandleFunc("/features/source/{name}", FeaturesSourceReq).Methods("GET")
 	r.HandleFunc("/features/add/{name}", FeaturesAddReq).Methods("PUT")
@@ -72,27 +75,47 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
+// Returns true if err is not nil, also logs the err and responds to the client
+func checkError(endpoint string, err error, w http.ResponseWriter) bool {
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Println("Error at", endpoint, ":", err)
+		return true
+	}
+	return false
+}
+
 func ValidateReq(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	output, err := exec.
-		Command("terraform-compliance", "-p", "plan.out", "-f", "../terraform-compliance/example/example_01/aws/").
+		Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).
 		CombinedOutput()
 
-	if err != nil {
-		os.Stderr.WriteString(err.Error())
-	} else {
-		fmt.Fprintf(w, string(output))
+	if checkError("/validate", err, w) {
+		return
 	}
+
+	_, err = fmt.Fprintf(w, string(output))
+	checkError("/validate", err, w)
 }
 
 func FeaturesReq(w http.ResponseWriter, r *http.Request) {
-	path := "../terraform-compliance/example/example_01/aws/"
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		log.Fatal(err)
+	defer r.Body.Close()
+
+	files, err := ioutil.ReadDir(featuresPath)
+	if checkError("/features", err, w) {
+		return
 	}
 
 	for _, f := range files {
-		fmt.Fprintln(w, f.Name())
+		name := f.Name()
+		if strings.HasSuffix(name, ".feature") {
+			_, err = fmt.Fprintln(w, strings.TrimSuffix(name, ".feature"))
+			if checkError("/features", err, w) {
+				return
+			}
+		}
 	}
 }
 
