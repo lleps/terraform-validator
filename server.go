@@ -14,7 +14,7 @@ import (
 
 const tfComplianceBin = "terraform-compliance"
 const featuresPath = "../terraform-compliance/example/example_01/aws/" // should use the same directory
-const planTmpFile = "/tmp/plan.out.tmp"                                // the plan.out is created here to test, and deleted after that.
+const planTmpFile = "tmpplan.out"                                // the plan.out is created here to test, and deleted after that.
 const helpMsg = `
 	USAGE:
 
@@ -83,11 +83,8 @@ func ValidateReq(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Run terraform-compliance against the created file
-	outputBytes, err := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
+	outputBytes, _ := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
 	log.Println(string(outputBytes))
-	if checkError("/validate", err, w) {
-		return
-	}
 
 	// Return the validation result
 	_, err = fmt.Fprintf(w, string(outputBytes))
