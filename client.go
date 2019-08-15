@@ -14,10 +14,10 @@ func main() {
 	// cmd flags
 	hostFlag := flag.String("host", "http://localhost:8080", "The host to connect to")
 	validateFlag := flag.String("validate", "", "Validate the given terraform plan file.")
-	listFeaturesFlag := flag.Bool("list-features", false, "List all features")
-	addFeatureFlag := flag.String("add-feature", "", "Add a new feature from the given file. The name will be the file name.")
-	featureSourceFlag := flag.String("feature-source", "", "Get the source code of the given feature.")
-	removeFeatureFlag := flag.String("remove-feature", "", "Remove the feature with the given name")
+	listFeaturesFlag := flag.Bool("list", false, "List all features")
+	addFeatureFlag := flag.String("add", "", "Add a new feature from the given file. The name will be the file name.")
+	featureSourceFlag := flag.String("read", "", "Get the source code of the given feature.")
+	removeFeatureFlag := flag.String("remove", "", "Remove the feature with the given name")
 	flag.Parse()
 	host := *hostFlag
 
@@ -37,19 +37,25 @@ func main() {
 	} else if *listFeaturesFlag { // --list-features
 		resContent, resCode, resErr = execRequest(host, "/features", "GET", "")
 	} else if *featureSourceFlag != "" { // --list-features
-		resContent, resCode, resErr = execRequest(host, "/feature/source/" + *featureSourceFlag, "GET", "")
+		resContent, resCode, resErr = execRequest(host, "/features/source/" + *featureSourceFlag, "GET", "")
 	} else if *addFeatureFlag != "" { // --add-feature
 		content, err := ioutil.ReadFile(*addFeatureFlag)
 		if err != nil {
-			log.Fatal("Can't read file:", err)
+			fmt.Println("Can't read file:", err)
+			return
+		}
+
+		if !strings.HasSuffix(*addFeatureFlag, ".feature") {
+			fmt.Println("File must end in .feature.")
 			return
 		}
 
 		fileWithoutExt := strings.TrimSuffix(*addFeatureFlag, ".feature")
-		resContent, resCode, resErr = execRequest(host, "/feature/add/" + fileWithoutExt, "POST", string(content))
+
+		resContent, resCode, resErr = execRequest(host, "/features/add/" + fileWithoutExt, "POST", string(content))
 	} else if *removeFeatureFlag != "" { // --remove-feature
 		fileWithoutExt := strings.TrimSuffix(*removeFeatureFlag, ".feature")
-		resContent, resCode, resErr = execRequest(host, "/feature/remove/" + fileWithoutExt, "REMOVE", "")
+		resContent, resCode, resErr = execRequest(host, "/features/remove/" + fileWithoutExt, "DELETE", "")
 	} else {
 		fmt.Println("No option given. Check -h to see options.")
 		return

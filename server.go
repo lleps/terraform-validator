@@ -35,9 +35,9 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/validate", ValidateReq).Methods("POST")
 	r.HandleFunc("/features", FeaturesReq).Methods("GET")
-	r.HandleFunc("/feature/source/{name}", FeaturesSourceReq).Methods("GET")
-	r.HandleFunc("/feature/add/{name}", FeaturesAddReq).Methods("POST")
-	r.HandleFunc("/feature/remove/{name}", FeaturesRemoveReq).Methods("DELETE")
+	r.HandleFunc("/features/source/{name}", FeaturesSourceReq).Methods("GET")
+	r.HandleFunc("/features/add/{name}", FeaturesAddReq).Methods("POST")
+	r.HandleFunc("/features/remove/{name}", FeaturesRemoveReq).Methods("DELETE")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
@@ -133,4 +133,8 @@ func FeaturesAddReq(w http.ResponseWriter, r *http.Request) {
 }
 
 func FeaturesRemoveReq(w http.ResponseWriter, r *http.Request) {
+	featureName := mux.Vars(r)["name"]
+	fullPath := featuresPath + "/" + featureName + ".feature"
+	checkError("/features/remove", os.Remove(fullPath), w)
+
 }
