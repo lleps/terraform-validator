@@ -15,36 +15,29 @@ import (
 const tfComplianceBin = "terraform-compliance"
 const featuresPath = "../terraform-compliance/example/example_01/aws/" // should use the same directory
 const planTmpFile = "tmpplan.out"                                // the plan.out is created here to test, and deleted after that.
-const helpMsg = `
-	USAGE:
-
- {program-name} --help       Show this
- {program-name} address      Start listening at address (example '0.0.0.0:80')
- {program-name}              Start listening at the default address (:8080)
-`
 
 func main() {
 	args := os.Args
-	if len(args) == 2 && args[1] == "--help" {
-		fmt.Print(strings.Replace(helpMsg, "{program-name}", args[0], -1))
+	addr := ":8080"
+	if len(args) == 2 && (args[1] == "-h" || args[1] == "--help")  {
+		fmt.Printf("Usage: %s [listen address (default %s)]", args[0], addr)
 		return
 	}
 
-	addr := ":8080"
 	if len(args) == 2 {
 		addr = args[1]
 		log.Printf("Listen at %s...\n", addr)
 	} else {
-		log.Printf("If you want to use an specific address, pass it as the only flag.")
+		log.Printf("If you want to use an specific address, pass it as a param.")
 		log.Printf("Listen at default %s...\n", addr)
 	}
 
 	r := mux.NewRouter()
 	r.HandleFunc("/validate", ValidateReq).Methods("POST")
 	r.HandleFunc("/features", FeaturesReq).Methods("GET")
-	r.HandleFunc("/features/source/{name}", FeaturesSourceReq).Methods("GET")
-	r.HandleFunc("/features/add/{name}", FeaturesAddReq).Methods("POST")
-	r.HandleFunc("/features/remove/{name}", FeaturesRemoveReq).Methods("DELETE")
+	r.HandleFunc("/feature/source/{name}", FeaturesSourceReq).Methods("GET")
+	r.HandleFunc("/feature/add/{name}", FeaturesAddReq).Methods("POST")
+	r.HandleFunc("/feature/remove/{name}", FeaturesRemoveReq).Methods("DELETE")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
@@ -115,6 +108,15 @@ func FeaturesReq(w http.ResponseWriter, r *http.Request) {
 }
 
 func FeaturesSourceReq(w http.ResponseWriter, r *http.Request) {
+	featureName := mux.Vars(r)["name"]
+	fullPath := featuresPath + "/" + featureName + ".feature"
+	content, err := ioutil.ReadFile(fullPath)
+	if checkError("/features/source", err, w) {
+		return
+	}
+
+	_, err = fmt.Fprint(w, string(content))
+	checkError("/features/source", err, w)
 }
 
 func FeaturesAddReq(w http.ResponseWriter, r *http.Request) {
@@ -123,9 +125,11 @@ func FeaturesAddReq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bodyString := string(content)
-	log.Printf("body:", bodyString)
-	fmt.Fprintf(w, bodyString)
+	// just write the body to the file.
+	// Will overwrite if the feature already exists
+	featureName := mux.Vars(r)["name"]
+	fullPath := featuresPath + "/" + featureName + ".feature"
+	checkError("/features/add", ioutil.WriteFile(fullPath, content, os.ModePerm), w)
 }
 
 func FeaturesRemoveReq(w http.ResponseWriter, r *http.Request) {

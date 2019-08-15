@@ -16,6 +16,7 @@ func main() {
 	validateFlag := flag.String("validate", "", "Validate the given terraform plan file.")
 	listFeaturesFlag := flag.Bool("list-features", false, "List all features")
 	addFeatureFlag := flag.String("add-feature", "", "Add a new feature from the given file. The name will be the file name.")
+	featureSourceFlag := flag.String("feature-source", "", "Get the source code of the given feature.")
 	removeFeatureFlag := flag.String("remove-feature", "", "Remove the feature with the given name")
 	flag.Parse()
 	host := *hostFlag
@@ -35,6 +36,8 @@ func main() {
 		resContent, resCode, resErr = execRequest(host, "/validate", "POST", asB64)
 	} else if *listFeaturesFlag { // --list-features
 		resContent, resCode, resErr = execRequest(host, "/features", "GET", "")
+	} else if *featureSourceFlag != "" { // --list-features
+		resContent, resCode, resErr = execRequest(host, "/feature/source/" + *featureSourceFlag, "GET", "")
 	} else if *addFeatureFlag != "" { // --add-feature
 		content, err := ioutil.ReadFile(*addFeatureFlag)
 		if err != nil {
@@ -42,15 +45,11 @@ func main() {
 			return
 		}
 
-		resContent, resCode, resErr = execRequest(host, "/validate", "POST", string(content))
+		fileWithoutExt := strings.TrimSuffix(*addFeatureFlag, ".feature")
+		resContent, resCode, resErr = execRequest(host, "/feature/add/" + fileWithoutExt, "POST", string(content))
 	} else if *removeFeatureFlag != "" { // --remove-feature
-		content, err := ioutil.ReadFile(*validateFlag)
-		if err != nil {
-			log.Fatal("Can't read file:", err)
-			return
-		}
-
-		resContent, resCode, resErr = execRequest(host, "/validate", "REMOVE", string(content))
+		fileWithoutExt := strings.TrimSuffix(*removeFeatureFlag, ".feature")
+		resContent, resCode, resErr = execRequest(host, "/feature/remove/" + fileWithoutExt, "REMOVE", "")
 	} else {
 		fmt.Println("No option given. Check -h to see options.")
 		return
@@ -68,7 +67,7 @@ func main() {
 		return
 	}
 
-	fmt.Println(resContent)
+	fmt.Print(resContent)
 }
 
 func execRequest(
