@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -13,46 +14,19 @@ import (
 
 const tfComplianceBin = "terraform-compliance"
 const featuresPath = "../terraform-compliance/example/example_01/aws/" // should use the same directory
-const planTmpFile = "./plan.out"                                       // the plan.out is created here to test, and deleted after that.
-const documentation = `
-This tool is used to manipulate the terraform-compliance tool
-and its state through a REST API to test terraform plan files,
-and edit the requirements as well.
-
+const planTmpFile = "/tmp/plan.out.tmp"                                // the plan.out is created here to test, and deleted after that.
+const helpMsg = `
 	USAGE:
 
  {program-name} --help       Show this
  {program-name} address      Start listening at address (example '0.0.0.0:80')
- {program-name}              Start Listening at the default address (:8080)
-
-	API:
-
-POST /test
-Test a terraform plan file with the current features. The plan file
-is passed as a raw base64 string in the body.
-
-GET /features
-List all the used features.
-
-GET /features/source/:name
-Get the source code of the feature named :name.
-
-PUT /features/add/:name
-Add a new feature with :name. The feature source code is also passed
-raw in the request body.
-The syntax used to describe features is specified at:
-https://github.com/eerkunt/terraform-compliance/blob/master/README.md
-New calls to /validate will use the new feature to test the plan file.
-
-DELETE /features/delete/:name
-Delete the feature with :name (if any). New calls to /validate won't use
-the deleted feature to test the plan file.
+ {program-name}              Start listening at the default address (:8080)
 `
 
 func main() {
 	args := os.Args
 	if len(args) == 2 && args[1] == "--help" {
-		fmt.Print(strings.Replace(documentation, "{program-name}", args[0], -1))
+		fmt.Print(strings.Replace(helpMsg, "{program-name}", args[0], -1))
 		return
 	}
 
@@ -66,10 +40,10 @@ func main() {
 	}
 
 	r := mux.NewRouter()
-	r.HandleFunc("/validate", ValidateReq).Methods("GET")
+	r.HandleFunc("/validate", ValidateReq).Methods("POST")
 	r.HandleFunc("/features", FeaturesReq).Methods("GET")
 	r.HandleFunc("/features/source/{name}", FeaturesSourceReq).Methods("GET")
-	r.HandleFunc("/features/add/{name}", FeaturesAddReq).Methods("PUT")
+	r.HandleFunc("/features/add/{name}", FeaturesAddReq).Methods("POST")
 	r.HandleFunc("/features/remove/{name}", FeaturesRemoveReq).Methods("DELETE")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(addr, nil))
@@ -85,19 +59,44 @@ func checkError(endpoint string, err error, w http.ResponseWriter) bool {
 	return false
 }
 
+// Takes a base64 string in the body with the plan file content,
+// run terraform-compliance against the file, and returns the
+// raw tool output as a response.
 func ValidateReq(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	output, err := exec.
-		Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).
-		CombinedOutput()
-
+	// Parse body (a base64 string)
+	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if checkError("/validate", err, w) {
 		return
 	}
 
-	_, err = fmt.Fprintf(w, string(output))
-	checkError("/validate", err, w)
+	planFileBytes, err := base64.StdEncoding.DecodeString(string(bodyBytes))
+	if checkError("/validate", err, w) {
+		return
+	}
+
+	// Write the file content on the given file
+	err = ioutil.WriteFile(planTmpFile, planFileBytes, os.ModePerm)
+	if checkError("/validate", err, w) {
+		return
+	}
+
+	// Run terraform-compliance against the created file
+	outputBytes, err := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
+	log.Println(string(outputBytes))
+	if checkError("/validate", err, w) {
+		return
+	}
+
+	// Return the validation result
+	_, err = fmt.Fprintf(w, string(outputBytes))
+	if checkError("/validate", err, w) {
+		return
+	}
+
+	// Delete the tmp file
+	checkError("/validate", os.Remove(planTmpFile), w)
 }
 
 func FeaturesReq(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +122,14 @@ func FeaturesSourceReq(w http.ResponseWriter, r *http.Request) {
 }
 
 func FeaturesAddReq(w http.ResponseWriter, r *http.Request) {
+	content, err := ioutil.ReadAll(r.Body)
+	if checkError("/features/add", err, w) {
+		return
+	}
+
+	bodyString := string(content)
+	log.Printf("body:", bodyString)
+	fmt.Fprintf(w, bodyString)
 }
 
 func FeaturesRemoveReq(w http.ResponseWriter, r *http.Request) {
