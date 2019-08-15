@@ -84,7 +84,6 @@ func ValidateReq(w http.ResponseWriter, r *http.Request) {
 
 	// Run terraform-compliance against the created file
 	outputBytes, _ := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
-	log.Println(string(outputBytes))
 
 	// Return the validation result
 	_, err = fmt.Fprintf(w, string(outputBytes))

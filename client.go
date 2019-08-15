@@ -2,46 +2,108 @@ package main
 
 import (
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 )
 
 func main() {
-	args := os.Args
-	if len(args) != 3 {
-		fmt.Println(args[0], "host", "plan-file")
+	// cmd flags
+	hostFlag := flag.String("host", "http://localhost:8080", "The host to connect to")
+	validateFlag := flag.String("validate", "", "Validate the given terraform plan file.")
+	listFeaturesFlag := flag.Bool("list-features", false, "List all features")
+	addFeatureFlag := flag.String("add-feature", "", "Add a new feature from the given file. The name will be the file name.")
+	removeFeatureFlag := flag.String("remove-feature", "", "Remove the feature with the given name")
+	flag.Parse()
+	host := *hostFlag
+
+	// send request depending on the flags
+	var resContent string
+	var resCode int
+	var resErr error
+	if *validateFlag != "" { // --validate
+		content, err := ioutil.ReadFile(*validateFlag)
+		if err != nil {
+			log.Fatal("Can't read file:", err)
+			return
+		}
+
+		asB64 := base64.StdEncoding.EncodeToString(content)
+		resContent, resCode, resErr = execRequest(host, "/validate", "POST", asB64)
+	} else if *listFeaturesFlag { // --list-features
+		resContent, resCode, resErr = execRequest(host, "/features", "GET", "")
+	} else if *addFeatureFlag != "" { // --add-feature
+		content, err := ioutil.ReadFile(*addFeatureFlag)
+		if err != nil {
+			log.Fatal("Can't read file:", err)
+			return
+		}
+
+		resContent, resCode, resErr = execRequest(host, "/validate", "POST", string(content))
+	} else if *removeFeatureFlag != "" { // --remove-feature
+		content, err := ioutil.ReadFile(*validateFlag)
+		if err != nil {
+			log.Fatal("Can't read file:", err)
+			return
+		}
+
+		resContent, resCode, resErr = execRequest(host, "/validate", "REMOVE", string(content))
+	} else {
+		fmt.Println("No option given. Check -h to see options.")
 		return
 	}
-	host := args[1]
-	planFile := args[2]
-	content, err := ioutil.ReadFile(planFile)
+
+	// show request result (or an error)
+	if resErr != nil {
+		fmt.Println("Error during request:", resErr)
+		return
+	}
+
+	if resCode != http.StatusOK {
+		fmt.Println("Invalid HTTP response code:", resCode)
+		fmt.Println(resContent)
+		return
+	}
+
+	fmt.Println(resContent)
+}
+
+func execRequest(
+	host string,
+	endpoint string,
+	reqType string,
+	content string,
+) (resContent string, resCode int, err error) {
+	url := host + endpoint
+	var resp *http.Response
+
+	switch reqType {
+	case "POST":
+		resp, err = http.Post(url, "text/plain", strings.NewReader(content))
+	case "GET":
+		resp, err = http.Get(url)
+	case "DELETE":
+		client := &http.Client{}
+		req, err := http.NewRequest("DELETE", url, strings.NewReader(content))
+		if err == nil {
+			resp, err = client.Do(req)
+		}
+	default:
+		panic(fmt.Sprintln("invalid reqType", reqType))
+	}
+
 	if err != nil {
-		log.Fatal("Can't read planfile:", err)
 		return
 	}
-
-	asBase64 := base64.StdEncoding.EncodeToString(content)
-	resp, err := http.Post(host+"/validate", "text/plain", strings.NewReader(asBase64))
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal("Can't post to /validate:", err)
 		return
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		log.Fatal("Bad HTTP code:", resp.StatusCode)
-		return
-	}
-
-	bodyResp, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal("Can't parse response:", err)
-		return
-	}
-
-	fmt.Println("Validation sent. Awaiting response...")
-	log.Println(string(bodyResp))
+	resContent = string(bodyBytes)
+	resCode = resp.StatusCode
+	return
 }
