@@ -33,108 +33,153 @@ func main() {
 	}
 
 	r := mux.NewRouter()
-	r.HandleFunc("/validate", ValidateReq).Methods("POST")
-	r.HandleFunc("/features", FeaturesReq).Methods("GET")
-	r.HandleFunc("/features/source/{name}", FeaturesSourceReq).Methods("GET")
-	r.HandleFunc("/features/add/{name}", FeaturesAddReq).Methods("POST")
-	r.HandleFunc("/features/remove/{name}", FeaturesRemoveReq).Methods("DELETE")
+	registerRequest(r, "/validate", validateReq, "GET")
+	registerRequest(r, "/features", featuresReq, "GET")
+	registerRequest(r, "/features/source/{name}", featureSourceReq, "GET")
+	registerRequest(r, "/features/add/{name}", featureAddReq, "POST")
+	registerRequest(r, "/features/remove/{name}", featureRemoveReq, "DELETE")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
-// Returns true if err is not nil, also logs the err and responds to the client
+// Returns true if err is not nil, also logs the err and responds to the client.
 func checkError(endpoint string, err error, w http.ResponseWriter) bool {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println("Error at", endpoint, ":", err)
+		_, _ = fmt.Fprintf(w,"Internal server error: %s", err)
 		return true
 	}
 	return false
 }
 
+// Register in the router a request with proper error handling and logging.
+func registerRequest(
+	router *mux.Router,
+	endpoint string,
+	handler func(string, map[string]string) (string, int, error),
+	method string,
+) {
+	router.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		// parse body and vars
+		vars := mux.Vars(r)
+		bodyBytes, err := ioutil.ReadAll(r.Body)
+		if checkError(endpoint, err, w) {
+			return
+		}
+
+		// execute the handler
+		response, code, err := handler(string(bodyBytes), vars)
+		if checkError(endpoint, err, w) {
+			return
+		}
+
+		// write response
+		w.WriteHeader(code)
+		_, err = fmt.Fprint(w, response)
+		checkError(endpoint, err, w)
+	}).Methods(method)
+}
+
 // Takes a base64 string in the body with the plan file content,
 // run terraform-compliance against the file, and returns the
 // raw tool output as a response.
-func ValidateReq(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
-	// Parse body (a base64 string)
-	bodyBytes, err := ioutil.ReadAll(r.Body)
-	if checkError("/validate", err, w) {
-		return
+func validateReq(body string, _ map[string]string) (string, int, error) {
+	planFileBytes, err := base64.StdEncoding.DecodeString(body)
+	if err != nil {
+		return "", 0, err
 	}
 
-	planFileBytes, err := base64.StdEncoding.DecodeString(string(bodyBytes))
-	if checkError("/validate", err, w) {
-		return
-	}
-
-	// Write the file content on the given file
 	err = ioutil.WriteFile(planTmpFile, planFileBytes, os.ModePerm)
-	if checkError("/validate", err, w) {
-		return
+	if err != nil {
+		return "", 0, err
 	}
 
-	// Run terraform-compliance against the created file
-	outputBytes, _ := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
-
-	// Return the validation result
-	_, err = fmt.Fprintf(w, string(outputBytes))
-	if checkError("/validate", err, w) {
-		return
+	outputBytes, err := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
+	if err != nil {
+		return "", 0, err
 	}
 
-	// Delete the tmp file
-	checkError("/validate", os.Remove(planTmpFile), w)
+	if err = os.Remove(planTmpFile); err != nil {
+		return "", 0, err
+	}
+
+	return string(outputBytes), http.StatusOK, nil
 }
 
-func FeaturesReq(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
 
+// List all files ending with ".feature" in featuresPath.
+func featuresReq(_ string, _ map[string]string) (string, int, error) {
 	files, err := ioutil.ReadDir(featuresPath)
-	if checkError("/features", err, w) {
-		return
+	if err != nil {
+		return "", 0, err
 	}
 
+	sb := strings.Builder{}
 	for _, f := range files {
 		name := f.Name()
 		if strings.HasSuffix(name, ".feature") {
-			_, err = fmt.Fprintln(w, strings.TrimSuffix(name, ".feature"))
-			if checkError("/features", err, w) {
-				return
-			}
+			sb.WriteString(strings.TrimSuffix(name, ".feature"))
+			sb.WriteRune('\n')
 		}
 	}
+
+	return sb.String(), http.StatusOK, nil
 }
 
-func FeaturesSourceReq(w http.ResponseWriter, r *http.Request) {
-	featureName := mux.Vars(r)["name"]
-	fullPath := featuresPath + "/" + featureName + ".feature"
-	content, err := ioutil.ReadFile(fullPath)
-	if checkError("/features/source", err, w) {
-		return
+// Returns true if the feature name is ok (doesn't contains invalid file characters)
+func validateFeatureName(name string) bool {
+	return !strings.ContainsAny(name, "./* ")
+}
+
+// Read the source code of the given feature and returns it.
+func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
+	featureName := vars["name"]
+	if !validateFeatureName(featureName) {
+		return "Illegal feature name.", http.StatusBadRequest, nil
 	}
 
-	_, err = fmt.Fprint(w, string(content))
-	checkError("/features/source", err, w)
+	fullPath := featuresPath + "/" + featureName + ".feature"
+	content, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		return "Feature not found", http.StatusNotFound, nil
+	}
+
+	return string(content), http.StatusOK, nil
 }
 
-func FeaturesAddReq(w http.ResponseWriter, r *http.Request) {
-	content, err := ioutil.ReadAll(r.Body)
-	if checkError("/features/add", err, w) {
-		return
+// Add a new request with the source code in the body
+func featureAddReq(body string, vars map[string]string) (string, int, error) {
+	featureName := vars["name"]
+	if !validateFeatureName(featureName) {
+		return "Illegal feature name.", http.StatusBadRequest, nil
 	}
 
 	// just write the body to the file.
 	// Will overwrite if the feature already exists
-	featureName := mux.Vars(r)["name"]
 	fullPath := featuresPath + "/" + featureName + ".feature"
-	checkError("/features/add", ioutil.WriteFile(fullPath, content, os.ModePerm), w)
+	err := ioutil.WriteFile(fullPath, []byte(body), os.ModePerm)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return "", http.StatusOK, nil
 }
 
-func FeaturesRemoveReq(w http.ResponseWriter, r *http.Request) {
-	featureName := mux.Vars(r)["name"]
-	fullPath := featuresPath + "/" + featureName + ".feature"
-	checkError("/features/remove", os.Remove(fullPath), w)
+// Remove the feature file with the given name
+func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
+	featureName := vars["name"]
+	if !validateFeatureName(featureName) {
+		return "Illegal feature name.", http.StatusBadRequest, nil
+	}
 
+	fullPath := featuresPath + "/" + featureName + ".feature"
+	err := os.Remove(fullPath)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return "", http.StatusOK, nil
 }
