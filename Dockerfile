@@ -12,10 +12,11 @@ RUN  apt-get update && \
      pip uninstall -y radish radish-bdd && \
      pip install radish radish-bdd && \
      rm -rf /var/lib/apt/lists/* && \
-     mkdir -p /app
+     mkdir -p /app && \
+     mkdir -p /app/features
 
 ADD server /app
 
 WORKDIR /app
 
-CMD ["server"]
+CMD ["/app/server"]
