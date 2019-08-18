@@ -33,24 +33,13 @@ func main() {
 	}
 
 	r := mux.NewRouter()
-	registerRequest(r, "/validate", validateReq, "GET")
+	registerRequest(r, "/validate", validateReq, "POST")
 	registerRequest(r, "/features", featuresReq, "GET")
 	registerRequest(r, "/features/source/{name}", featureSourceReq, "GET")
 	registerRequest(r, "/features/add/{name}", featureAddReq, "POST")
 	registerRequest(r, "/features/remove/{name}", featureRemoveReq, "DELETE")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(addr, nil))
-}
-
-// Returns true if err is not nil, also logs the err and responds to the client.
-func checkError(endpoint string, err error, w http.ResponseWriter) bool {
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Println("Error at", endpoint, ":", err)
-		_, _ = fmt.Fprintf(w,"Internal server error: %s", err)
-		return true
-	}
-	return false
 }
 
 // Register in the router a request with proper error handling and logging.
@@ -63,23 +52,36 @@ func registerRequest(
 	router.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
+		log.Println()
+		log.Printf("%s %s [from %s]", r.Method, r.URL, r.RemoteAddr)
+
 		// parse body and vars
 		vars := mux.Vars(r)
 		bodyBytes, err := ioutil.ReadAll(r.Body)
-		if checkError(endpoint, err, w) {
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Println("Can't read body:", err)
 			return
 		}
 
 		// execute the handler
 		response, code, err := handler(string(bodyBytes), vars)
-		if checkError(endpoint, err, w) {
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = fmt.Fprint(w, response)
+			log.Println("Handler error:", err)
 			return
 		}
 
 		// write response
 		w.WriteHeader(code)
 		_, err = fmt.Fprint(w, response)
-		checkError(endpoint, err, w)
+		if err != nil {
+			log.Println("Can't write response:", err)
+		}
+
+		// log request and response code
+		log.Printf("HTTP Response: %d", code)
 	}).Methods(method)
 }
 
@@ -98,8 +100,13 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 	}
 
 	outputBytes, err := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
+	outputString := string(outputBytes)
+	log.Printf(" === %s output ===", tfComplianceBin)
+	log.Printf(outputString)
+	log.Printf(" === end output ===")
+
 	if err != nil {
-		return "", 0, err
+		return outputString, 0, err
 	}
 
 	if err = os.Remove(planTmpFile); err != nil {
@@ -108,7 +115,6 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 
 	return string(outputBytes), http.StatusOK, nil
 }
-
 
 // List all files ending with ".feature" in featuresPath.
 func featuresReq(_ string, _ map[string]string) (string, int, error) {
@@ -150,7 +156,7 @@ func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
 	return string(content), http.StatusOK, nil
 }
 
-// Add a new request with the source code in the body
+// Add a new feature with the source code in the body
 func featureAddReq(body string, vars map[string]string) (string, int, error) {
 	featureName := vars["name"]
 	if !validateFeatureName(featureName) {
@@ -178,7 +184,11 @@ func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 	fullPath := featuresPath + "/" + featureName + ".feature"
 	err := os.Remove(fullPath)
 	if err != nil {
-		return "", 0, err
+		if os.IsNotExist(err) {
+			return "Feature not found", 404, nil
+		} else {
+			return "", 0, err
+		}
 	}
 
 	return "", http.StatusOK, nil

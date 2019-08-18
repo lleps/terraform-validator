@@ -68,7 +68,7 @@ func main() {
 	}
 
 	if resCode != http.StatusOK {
-		fmt.Println("Invalid HTTP response code:", resCode)
+		fmt.Println("HTTP code:", resCode)
 		fmt.Println(resContent)
 		return
 	}
