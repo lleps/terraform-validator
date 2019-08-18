@@ -13,8 +13,8 @@ import (
 )
 
 const tfComplianceBin = "terraform-compliance"
-const featuresPath = "../terraform-compliance/example/example_01/aws/" // should use the same directory
-const planTmpFile = "tmpplan.out"                                // the plan.out is created here to test, and deleted after that.
+const featuresPath = "./features"
+const planTmpFile = "tmp_plan.out"
 
 func main() {
 	args := os.Args
