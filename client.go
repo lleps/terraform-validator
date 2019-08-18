@@ -18,6 +18,8 @@ func main() {
 	addFeatureFlag := flag.String("add", "", "Add a new feature from the given file. The name will be the file name.")
 	featureSourceFlag := flag.String("read", "", "Get the source code of the given feature.")
 	removeFeatureFlag := flag.String("remove", "", "Remove the feature with the given name")
+	replaceFlag := flag.Bool("replace", false, "For -add, to replace the feature if it already exists.")
+
 	flag.Parse()
 	host := *hostFlag
 
@@ -50,9 +52,16 @@ func main() {
 			return
 		}
 
-		fileWithoutExt := strings.TrimSuffix(*addFeatureFlag, ".feature")
-
-		resContent, resCode, resErr = execRequest(host, "/features/add/" + fileWithoutExt, "POST", string(content))
+		featureName := strings.TrimSuffix(*addFeatureFlag, ".feature")
+		exists, err := checkFeatureExists(host, featureName)
+		resErr = err
+		if resErr == nil {
+			if exists && !*replaceFlag {
+				fmt.Printf("Feature '%s' already exists. Pass --replace to overwrite it.\n", featureName)
+				return
+			}
+			resContent, resCode, resErr = execRequest(host, "/features/add/" + featureName, "POST", string(content))
+		}
 	} else if *removeFeatureFlag != "" { // --remove-feature
 		fileWithoutExt := strings.TrimSuffix(*removeFeatureFlag, ".feature")
 		resContent, resCode, resErr = execRequest(host, "/features/remove/" + fileWithoutExt, "DELETE", "")
@@ -74,6 +83,25 @@ func main() {
 	}
 
 	fmt.Print(resContent)
+}
+
+func checkFeatureExists(host, name string) (bool, error) {
+	content, code, err := execRequest(host, "/features", "GET", "")
+	if err != nil {
+		return false, nil
+	}
+
+	if code == 200 {
+		for _, s := range strings.Split(content, "\n") {
+			if s == name {
+				return true, nil
+			}
+		}
+	} else {
+		return false, fmt.Errorf("code not 200: %d", code)
+	}
+
+	return false, nil
 }
 
 func execRequest(
