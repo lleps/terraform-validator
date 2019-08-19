@@ -16,7 +16,7 @@ RUN  apt-get update && \
      mkdir -p /app/features
 
 ADD server /app
-
+ADD features/* /app/features/
 WORKDIR /app
 
 CMD ["/app/server"]
