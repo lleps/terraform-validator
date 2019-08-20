@@ -28,3 +28,16 @@ New calls to /validate will use this new feature to test the plan file.
 ### `DELETE /features/delete/{name}`
 Delete the `name` feature, so it's not used to test plan
 files anymore.
+
+# Features to be added
+1) AWS Credentials should not be hardcoded. 
+2) VPC Flow Logs should be enabled 
+3) Remove all rules associated with default route tables, ACLs, SGs, in the default VPC in all regions
+4) Resources should use encryption when they are created
+5) Resources should use encryption in transit 
+6) Resources should follow basic naming standards
+7) S3 buckets should not be public unless approved by Security Engineering 
+8) S3 buckets should have logging enabled
+9) Security gropups should not be overly open. Exposure of insecure protocols should be limited for ingress traffic. Only selected ports and approved by Security Engineering should be open
+10) CloudTrail must be enabled in all Regions 
+11) GuardDuty must be enabled in all VPCs, in all regions
