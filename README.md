@@ -38,6 +38,6 @@ files anymore.
 6) Resources should follow basic naming standards
 7) S3 buckets should not be public unless approved by Security Engineering 
 8) S3 buckets should have logging enabled
-9) Security gropups should not be overly open. Exposure of insecure protocols should be limited for ingress traffic. Only selected ports and approved by Security Engineering should be open
+9) Security groups should not be overly open. Exposure of insecure protocols should be limited for ingress traffic. Only selected ports and approved by Security Engineering should be open
 10) CloudTrail must be enabled in all Regions 
 11) GuardDuty must be enabled in all VPCs, in all regions
