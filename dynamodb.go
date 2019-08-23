@@ -3,10 +3,14 @@ package main
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"log"
+	"strings"
+	"time"
 )
 
 // Layout of an entry in the DynamoDB table.
@@ -16,11 +20,51 @@ type ComplianceFeature struct {
 }
 
 // Creates a DynamoDB client using the default authentication method.
-func createDynamoDBClient() *dynamodb.DynamoDB {
+func createDynamoDBClientAndTable(tableName string) (*dynamodb.DynamoDB, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
-	return dynamodb.New(sess)
+
+	svc := dynamodb.New(sess)
+
+	// create table schema, only 2 string fields
+	input := &dynamodb.CreateTableInput{
+		AttributeDefinitions: []*dynamodb.AttributeDefinition{
+			{
+				AttributeName: aws.String("FeatureName"),
+				AttributeType: aws.String("S"),
+			},
+		},
+		KeySchema: []*dynamodb.KeySchemaElement{
+			{
+				AttributeName: aws.String("FeatureName"),
+				KeyType:       aws.String("HASH"),
+			},
+		},
+		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(5),
+			WriteCapacityUnits: aws.Int64(5),
+		},
+		TableName: aws.String(tableName),
+	}
+
+	_, err := svc.CreateTable(input)
+	if err != nil {
+		errAws := err.(awserr.Error)
+		if strings.Contains(errAws.Message(), "Table already exists") {
+			// ignore this error.
+		} else {
+			return nil, err
+		}
+	} else {
+		// The table is being created. If an upcoming query to this table follows this
+		// call immediately, may fail because the table is not yet created. Wait a few seconds.
+		log.Printf("Sleep 10 sec to wait until table '%s' is created in DynamoDB...", tableName)
+		time.Sleep(10 * time.Second)
+		log.Printf("Done!")
+	}
+
+	return svc, nil
 }
 
 // Inserts the given feature in dynamo, in the given tableName.
