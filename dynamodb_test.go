@@ -1,38 +1,78 @@
 package main
 
-import "testing"
+import (
+	"log"
+	"testing"
+)
 
+// This tests the whole thing.
+// 1. Insertion: Inserts a few features on DB.
+// 2. Loading: Load all the inserted features and check for (mis)match.
+// 3. Removing: Remove one of the features.
+// 4. Removing check: Load them again and ensure the feature is not present anymore.
+// 5. Updating: Change the source of a feature.
+// 6. Updating check: Load the feature and see if the source is changed.
 func TestDynamoDB(t *testing.T) {
-	// Insert in the DB some features
+	// 1. Insertion
 	features := []ComplianceFeature { {"abc", "123"}, {"jjj", "456"}, }
-	tableName := "tf-compliance-features-test" // TODO: append "-test". Should create the table clientside.
-	svc, err := createDynamoDBClientAndTable(tableName)
-	if err != nil {
-		t.Fatalf("Can't create dynamoDB client or table: %v", err)
+	ddb := newDynamoDBInstance("tf-compliance-features-test")
+	if err := ddb.initTable(); err != nil {
+		t.Fatalf("initTable: %v", err)
 	}
 
 	for _, f := range features {
-		err := insertFeatureInDynamoDB(svc, tableName, f)
-		if err != nil {
-			t.Fatalf("err inserting: %v", err)
+		if err := ddb.insertFeature(f); err != nil {
+			t.Fatalf("inserting: %v", err)
 		}
 	}
-	t.Logf("Inserted %d features.", len(features))
 
-	// Now fetch them, and ensure they're the same as the inserted ones.
-	loadedFeatures, err := loadAllFeaturesFromDynamoDB(svc, tableName)
+	// 2. Loading
+	loadedFeatures, err := ddb.loadAllFeatures()
 	if err != nil {
-		t.Fatalf("err loading: %v", err)
+		log.Fatalf("loading: %v", err)
+	}
+	compareFeaturesOrFatal(features, loadedFeatures, t)
+
+	// 3. Removing
+	if err := ddb.removeFeatureByName("abc"); err != nil {
+		t.Fatalf("removing: %v", err)
+	}
+	features = features[1:]
+
+	// 4. Removing check
+	loadedFeatures, err = ddb.loadAllFeatures()
+	if err != nil {
+		log.Fatalf("removing check: %v", err)
+	}
+	compareFeaturesOrFatal(features, loadedFeatures, t)
+
+	// 5. Updating
+	features[0] = ComplianceFeature{ "jjj", "999" }
+	if err := ddb.insertFeature(features[0]); err != nil {
+		log.Fatalf("update: %v", err)
 	}
 
-	if len(loadedFeatures) != len(features) {
-		t.Fatalf("error: len(loadedFeatures): %d, len(features): %d.\nloadedFeatures: %v",
-			len(loadedFeatures), len(features), loadedFeatures)
+	// 6. Updating check
+	loadedFeatures, err = ddb.loadAllFeatures()
+	if err != nil {
+		log.Fatalf("update check: %v", err)
+	}
+	compareFeaturesOrFatal(features, loadedFeatures, t)
+}
+
+func compareFeaturesOrFatal(expected []ComplianceFeature, actual []ComplianceFeature, t *testing.T) {
+	if len(expected) != len(actual) {
+		t.Fatalf("len(expected): %d != len(actual): %d.\n" +
+			"expected: %v\n" +
+			"actual: %v",
+			len(expected), len(actual),
+			expected,
+			actual)
 	}
 
-	for i, f := range features {
-		if f != loadedFeatures[i] {
-			t.Errorf("Feature mismatch at idx %d. Loaded: %v. Original: %v", i, loadedFeatures[i], f)
+	for i, f := range expected {
+		if f != actual[i] {
+			t.Errorf("Feature mismatch at idx %d. Expected: %v. Actual: %v", i, f, actual[i])
 		}
 	}
 }

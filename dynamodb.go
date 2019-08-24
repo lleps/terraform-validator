@@ -19,13 +19,23 @@ type ComplianceFeature struct {
 	FeatureSource string
 }
 
-// Creates a DynamoDB client using the default authentication method.
-func createDynamoDBClientAndTable(tableName string) (*dynamodb.DynamoDB, error) {
+// Encapsulates an instance of a dynamoDB connection in a specific table.
+type dynamoDBInstance struct {
+	svc *dynamodb.DynamoDB
+	tableName string
+}
+
+// Create a DynamoDB instance using the default aws authentication method.
+func newDynamoDBInstance(tableName string) *dynamoDBInstance {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	svc := dynamodb.New(sess)
+	return &dynamoDBInstance{ dynamodb.New(sess), tableName }
+}
+
+// Create the table if it doesn't exists.
+func (ddb *dynamoDBInstance) initTable() error {
 
 	// create table schema, only 2 string fields
 	input := &dynamodb.CreateTableInput{
@@ -45,30 +55,30 @@ func createDynamoDBClientAndTable(tableName string) (*dynamodb.DynamoDB, error) 
 			ReadCapacityUnits:  aws.Int64(5),
 			WriteCapacityUnits: aws.Int64(5),
 		},
-		TableName: aws.String(tableName),
+		TableName: aws.String(ddb.tableName),
 	}
 
-	_, err := svc.CreateTable(input)
+	_, err := ddb.svc.CreateTable(input)
 	if err != nil {
 		errAws := err.(awserr.Error)
 		if strings.Contains(errAws.Message(), "Table already exists") {
 			// ignore this error.
 		} else {
-			return nil, err
+			return err
 		}
 	} else {
 		// The table is being created. If an upcoming query to this table follows this
 		// call immediately, may fail because the table is not yet created. Wait a few seconds.
-		log.Printf("Sleep 10 sec to wait until table '%s' is created in DynamoDB...", tableName)
+		log.Printf("Sleep 10 sec to wait until table '%s' is created in DynamoDB...", ddb.tableName)
 		time.Sleep(10 * time.Second)
 		log.Printf("Done!")
 	}
 
-	return svc, nil
+	return nil
 }
 
-// Inserts the given feature in dynamo, in the given tableName.
-func insertFeatureInDynamoDB(svc *dynamodb.DynamoDB, tableName string, feature ComplianceFeature) error {
+// Inserts the given feature in the dynamoInstance. TODO: If it already exists, does nothing or overwrites?
+func (ddb *dynamoDBInstance) insertFeature(feature ComplianceFeature) error {
 	av, err := dynamodbattribute.MarshalMap(feature)
 	if err != nil {
 		return err
@@ -76,9 +86,9 @@ func insertFeatureInDynamoDB(svc *dynamodb.DynamoDB, tableName string, feature C
 
 	input := &dynamodb.PutItemInput{
 		Item:      av,
-		TableName: aws.String(tableName),
+		TableName: aws.String(ddb.tableName),
 	}
-	_, err = svc.PutItem(input)
+	_, err = ddb.svc.PutItem(input)
 	if err != nil {
 		return err
 	}
@@ -86,8 +96,8 @@ func insertFeatureInDynamoDB(svc *dynamodb.DynamoDB, tableName string, feature C
 	return nil
 }
 
-// Read and parse into []ComplianceFeature all the features present in the given tableName.
-func loadAllFeaturesFromDynamoDB(svc *dynamodb.DynamoDB, tableName string) ([]ComplianceFeature, error) {
+// Read and parse into []ComplianceFeature all the features present in this instance's table.
+func (ddb *dynamoDBInstance) loadAllFeatures() ([]ComplianceFeature, error) {
 
 	// Create a projection (which "columns" we want to read)
 	proj := expression.NamesList(expression.Name("FeatureName"), expression.Name("FeatureSource"))
@@ -102,11 +112,11 @@ func loadAllFeaturesFromDynamoDB(svc *dynamodb.DynamoDB, tableName string) ([]Co
 		ExpressionAttributeValues: expr.Values(),
 		FilterExpression:          expr.Filter(),
 		ProjectionExpression:      expr.Projection(),
-		TableName:                 aws.String(tableName),
+		TableName:                 aws.String(ddb.tableName),
 	}
 
 	// Exec the request
-	result, err := svc.Scan(params)
+	result, err := ddb.svc.Scan(params)
 	if err != nil {
 		return nil, err
 	}
@@ -124,4 +134,22 @@ func loadAllFeaturesFromDynamoDB(svc *dynamodb.DynamoDB, tableName string) ([]Co
 	}
 
 	return featuresParsed, nil
+}
+
+func (ddb *dynamoDBInstance) removeFeatureByName(name string) error {
+	input := &dynamodb.DeleteItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"FeatureName": {
+				S: aws.String(name),
+			},
+		},
+		TableName: aws.String(ddb.tableName),
+	}
+
+	_, err := ddb.svc.DeleteItem(input)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
