@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -15,27 +14,27 @@ import (
 
 // Layout of an entry in the DynamoDB table.
 type ComplianceFeature struct {
-	FeatureName string
+	FeatureName   string
 	FeatureSource string
 }
 
-// Encapsulates an instance of a dynamoDB connection in a specific table.
-type dynamoDBInstance struct {
-	svc *dynamodb.DynamoDB
+// Easy-to-use interface to persist ComplianceFeature items on a dynamoDB table.
+type dynamoDBFeaturesTable struct {
+	svc       *dynamodb.DynamoDB
 	tableName string
 }
 
 // Create a DynamoDB instance using the default aws authentication method.
-func newDynamoDBInstance(tableName string) *dynamoDBInstance {
+func newDynamoDBFeaturesTable(tableName string) *dynamoDBFeaturesTable {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	return &dynamoDBInstance{ dynamodb.New(sess), tableName }
+	return &dynamoDBFeaturesTable{dynamodb.New(sess), tableName}
 }
 
-// Create the table if it doesn't exists.
-func (ddb *dynamoDBInstance) initTable() error {
+// Ensure the table exists in dynamo. If it doesn't, create it. Otherwise NOP.
+func (ddb *dynamoDBFeaturesTable) ensureTableExists() error {
 
 	// create table schema, only 2 string fields
 	input := &dynamodb.CreateTableInput{
@@ -77,8 +76,8 @@ func (ddb *dynamoDBInstance) initTable() error {
 	return nil
 }
 
-// Inserts the given feature in the dynamoInstance. TODO: If it already exists, does nothing or overwrites?
-func (ddb *dynamoDBInstance) insertFeature(feature ComplianceFeature) error {
+// Inserts or update the given feature on the table.
+func (ddb *dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error {
 	av, err := dynamodbattribute.MarshalMap(feature)
 	if err != nil {
 		return err
@@ -96,8 +95,8 @@ func (ddb *dynamoDBInstance) insertFeature(feature ComplianceFeature) error {
 	return nil
 }
 
-// Read and parse into []ComplianceFeature all the features present in this instance's table.
-func (ddb *dynamoDBInstance) loadAllFeatures() ([]ComplianceFeature, error) {
+// Load all the features stored on this table.
+func (ddb *dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
 
 	// Create a projection (which "columns" we want to read)
 	proj := expression.NamesList(expression.Name("FeatureName"), expression.Name("FeatureSource"))
@@ -136,7 +135,8 @@ func (ddb *dynamoDBInstance) loadAllFeatures() ([]ComplianceFeature, error) {
 	return featuresParsed, nil
 }
 
-func (ddb *dynamoDBInstance) removeFeatureByName(name string) error {
+// Remove from this table the feature with the given name (if any). Otherwise, NOP.
+func (ddb *dynamoDBFeaturesTable) removeByName(name string) error {
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"FeatureName": {
