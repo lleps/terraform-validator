@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -16,21 +17,24 @@ const tfComplianceBin = "terraform-compliance"
 const featuresPath = "./features"
 const planTmpFile = "tmp_plan.out"
 
+var db dynamoDBFeaturesTable
+
 func main() {
-	args := os.Args
-	addr := ":8080"
-	if len(args) == 2 && (args[1] == "-h" || args[1] == "--help")  {
-		fmt.Printf("Usage: %s [listen address (default %s)]", args[0], addr)
-		return
+	listenFlag := flag.String("listen", ":8080", "On which address to listen")
+	dynamoTableFlag := flag.String("dynamo-table", "tf-validator", "The dynamoDB table name to use")
+	flag.Parse()
+
+	log.Printf("Init DynamoDB table '%s'...", *dynamoTableFlag)
+	db = newDynamoDBFeaturesTable(*dynamoTableFlag)
+	if err := db.ensureTableExists(); err != nil {
+		log.Fatalf("Can't make dynamoDB table: %v", err)
 	}
 
-	if len(args) == 2 {
-		addr = args[1]
-		log.Printf("Listen at %s...\n", addr)
-	} else {
-		log.Printf("If you want to use an specific address, pass it as a param.")
-		log.Printf("Listen at default %s...\n", addr)
+	if err := syncFeaturesFolderFromDB(); err != nil {
+		log.Fatalf("Can't sync features from db (features path: '%s'): %v", featuresPath, err)
 	}
+
+	log.Printf("Will listen on '%s'...", *listenFlag)
 
 	r := mux.NewRouter()
 	registerRequest(r, "/validate", validateReq, "POST")
@@ -39,7 +43,7 @@ func main() {
 	registerRequest(r, "/features/add/{name}", featureAddReq, "POST")
 	registerRequest(r, "/features/remove/{name}", featureRemoveReq, "DELETE")
 	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Fatal(http.ListenAndServe(*listenFlag, nil))
 }
 
 // Register in the router a request with proper error handling and logging.
@@ -116,23 +120,118 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 	return string(outputBytes), http.StatusOK, nil
 }
 
-// List all files ending with ".feature" in featuresPath.
+// List all features in the database.
 func featuresReq(_ string, _ map[string]string) (string, int, error) {
-	files, err := ioutil.ReadDir(featuresPath)
+	features, err := db.loadAll()
 	if err != nil {
 		return "", 0, err
 	}
 
 	sb := strings.Builder{}
-	for _, f := range files {
-		name := f.Name()
-		if strings.HasSuffix(name, ".feature") {
-			sb.WriteString(strings.TrimSuffix(name, ".feature"))
-			sb.WriteRune('\n')
-		}
+	for _, f := range features {
+		sb.WriteString(f.FeatureName)
+		sb.WriteRune('\n')
 	}
 
 	return sb.String(), http.StatusOK, nil
+}
+
+// Get the source code of the given feature and returns it.
+func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
+	featureName := vars["name"]
+	if !validateFeatureName(featureName) {
+		return "Illegal feature name.", http.StatusBadRequest, nil
+	}
+
+	features, err := db.loadAll()
+	if err != nil {
+		return "", 0, err
+	}
+
+	for _, f := range features {
+		if f.FeatureName == featureName {
+			return f.FeatureSource, http.StatusOK, nil
+		}
+	}
+
+	return "Feature not found", http.StatusNotFound, nil
+}
+
+// Add a new feature, with the source code specified in the body.
+func featureAddReq(body string, vars map[string]string) (string, int, error) {
+	featureName := vars["name"]
+	if !validateFeatureName(featureName) {
+		return "Illegal feature name.", http.StatusBadRequest, nil
+	}
+
+	if err := db.insertOrUpdate(ComplianceFeature{ featureName, body }); err != nil {
+		return "", 0, err
+	}
+
+	if err := syncFeaturesFolderFromDB(); err != nil {
+		return "", 0, err
+	}
+
+	return "", http.StatusOK, nil
+}
+
+// Remove the feature with the given name.
+func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
+	featureName := vars["name"]
+	if !validateFeatureName(featureName) {
+		return "Illegal feature name.", http.StatusBadRequest, nil
+	}
+
+	exists, err := checkFeatureExists(featureName)
+	if err != nil {
+		return "", 0, err
+	}
+
+	if !exists {
+		return "Feature not found", http.StatusNotFound, nil
+	}
+
+	if err := db.removeByName(featureName); err != nil {
+		return "", 0, err
+	}
+
+	if err := syncFeaturesFolderFromDB(); err != nil {
+		return "", 0, err
+	}
+
+	return "", http.StatusOK, nil
+}
+
+
+// This writes all the .feature files (required by compliance) in
+// the features folder, based on the content from the DB.
+func syncFeaturesFolderFromDB() error {
+	// Empty the folder
+	if err := os.RemoveAll(featuresPath); err != nil {
+		if os.IsNotExist(err) {
+			// ok. Not created yet
+		} else {
+			// somewhat with permissions maybe
+			return err
+		}
+	}
+	if err := os.MkdirAll(featuresPath, os.ModePerm); err != nil {
+		return err
+	}
+
+	// Write all feature files
+	features, err := db.loadAll()
+	if err != nil {
+		return err
+	}
+	for _, f := range features {
+		filePath := featuresPath + "/" + f.FeatureName + ".feature"
+		if err := ioutil.WriteFile(filePath, []byte(f.FeatureSource), os.ModePerm); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Returns true if the feature name is ok (doesn't contains invalid file characters)
@@ -140,56 +239,17 @@ func validateFeatureName(name string) bool {
 	return !strings.ContainsAny(name, "./* ")
 }
 
-// Read the source code of the given feature and returns it.
-func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
-	featureName := vars["name"]
-	if !validateFeatureName(featureName) {
-		return "Illegal feature name.", http.StatusBadRequest, nil
-	}
-
-	fullPath := featuresPath + "/" + featureName + ".feature"
-	content, err := ioutil.ReadFile(fullPath)
+// Returns true if the given feature name exists in the DB, false otherwise.
+func checkFeatureExists(name string) (bool, error) {
+	features, err := db.loadAll()
 	if err != nil {
-		return "Feature not found", http.StatusNotFound, nil
+		return false, err
 	}
 
-	return string(content), http.StatusOK, nil
-}
-
-// Add a new feature with the source code in the body
-func featureAddReq(body string, vars map[string]string) (string, int, error) {
-	featureName := vars["name"]
-	if !validateFeatureName(featureName) {
-		return "Illegal feature name.", http.StatusBadRequest, nil
-	}
-
-	// just write the body to the file.
-	// Will overwrite if the feature already exists
-	fullPath := featuresPath + "/" + featureName + ".feature"
-	err := ioutil.WriteFile(fullPath, []byte(body), os.ModePerm)
-	if err != nil {
-		return "", 0, err
-	}
-
-	return "", http.StatusOK, nil
-}
-
-// Remove the feature file with the given name
-func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
-	featureName := vars["name"]
-	if !validateFeatureName(featureName) {
-		return "Illegal feature name.", http.StatusBadRequest, nil
-	}
-
-	fullPath := featuresPath + "/" + featureName + ".feature"
-	err := os.Remove(fullPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "Feature not found", 404, nil
-		} else {
-			return "", 0, err
+	for _, f := range features {
+		if f.FeatureName == name {
+			return true, nil
 		}
 	}
-
-	return "", http.StatusOK, nil
+	return false, nil
 }

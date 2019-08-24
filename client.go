@@ -53,7 +53,7 @@ func main() {
 		}
 
 		featureName := strings.TrimSuffix(*addFeatureFlag, ".feature")
-		exists, err := checkFeatureExists(host, featureName)
+		exists, err := checkIfFeatureExists(host, featureName)
 		resErr = err
 		if resErr == nil {
 			if exists && !*replaceFlag {
@@ -85,7 +85,7 @@ func main() {
 	fmt.Print(resContent)
 }
 
-func checkFeatureExists(host, name string) (bool, error) {
+func checkIfFeatureExists(host, name string) (bool, error) {
 	content, code, err := execRequest(host, "/features", "GET", "")
 	if err != nil {
 		return false, nil

@@ -25,16 +25,16 @@ type dynamoDBFeaturesTable struct {
 }
 
 // Create a DynamoDB instance using the default aws authentication method.
-func newDynamoDBFeaturesTable(tableName string) *dynamoDBFeaturesTable {
+func newDynamoDBFeaturesTable(tableName string) dynamoDBFeaturesTable {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	return &dynamoDBFeaturesTable{dynamodb.New(sess), tableName}
+	return dynamoDBFeaturesTable{dynamodb.New(sess), tableName}
 }
 
 // Ensure the table exists in dynamo. If it doesn't, create it. Otherwise NOP.
-func (ddb *dynamoDBFeaturesTable) ensureTableExists() error {
+func (ddb dynamoDBFeaturesTable) ensureTableExists() error {
 
 	// create table schema, only 2 string fields
 	input := &dynamodb.CreateTableInput{
@@ -77,7 +77,7 @@ func (ddb *dynamoDBFeaturesTable) ensureTableExists() error {
 }
 
 // Inserts or update the given feature on the table.
-func (ddb *dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error {
+func (ddb dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error {
 	av, err := dynamodbattribute.MarshalMap(feature)
 	if err != nil {
 		return err
@@ -96,7 +96,7 @@ func (ddb *dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) erro
 }
 
 // Load all the features stored on this table.
-func (ddb *dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
+func (ddb dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
 
 	// Create a projection (which "columns" we want to read)
 	proj := expression.NamesList(expression.Name("FeatureName"), expression.Name("FeatureSource"))
@@ -136,7 +136,7 @@ func (ddb *dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
 }
 
 // Remove from this table the feature with the given name (if any). Otherwise, NOP.
-func (ddb *dynamoDBFeaturesTable) removeByName(name string) error {
+func (ddb dynamoDBFeaturesTable) removeByName(name string) error {
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"FeatureName": {
