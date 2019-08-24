@@ -21,7 +21,7 @@ var db dynamoDBFeaturesTable
 
 func main() {
 	listenFlag := flag.String("listen", ":8080", "On which address to listen")
-	dynamoTableFlag := flag.String("dynamo-table", "tf-validator", "The dynamoDB table name to use")
+	dynamoTableFlag := flag.String("dynamodb-features-table", "terraform-validator/features", "The dynamoDB table to use")
 	flag.Parse()
 
 	log.Printf("Init DynamoDB table '%s'...", *dynamoTableFlag)
