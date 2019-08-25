@@ -158,10 +158,6 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		return outputString, 0, err
 	}
 
-	if err = os.Remove(planTmpFile); err != nil {
-		return "", 0, err
-	}
-
 	return string(outputBytes), http.StatusOK, nil
 }
 
