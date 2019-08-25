@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 const tfComplianceBin = "terraform-compliance"
@@ -128,37 +129,86 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
-	path := os.TempDir() + "/" + "compliance_plan.out"
-	err = ioutil.WriteFile(path, planFileBytes, os.ModePerm)
+	if len(planFileBytes) == 0 {
+		return "No body given", http.StatusBadRequest, nil
+	}
+
+	// stores the file content given to tfComplianceBin
+	var complianceToolInput []byte
+
+	// in case the content is not already a json (doesn't starts with "{"), may be in
+	// tf bin format (like plan.out or terraform.tfstate). Try to convert it to json.
+	if planFileBytes[0] != '{' {
+		asJson, err := convertTerraformBinToJson(planFileBytes)
+		if err != nil {
+			return fmt.Sprintf("Content given can't be converted to json: %v", err), http.StatusBadRequest, nil
+		}
+		complianceToolInput = []byte(asJson)
+	} else {
+		complianceToolInput = planFileBytes
+	}
+
+	// write the json content to a tmp file
+	jsonTmpPath := os.TempDir() + "/" + "compliance_input.json"
+	err = ioutil.WriteFile(jsonTmpPath, complianceToolInput, os.ModePerm)
 	if err != nil {
 		return "", 0, err
 	}
-	defer os.Remove(path)
+	defer os.Remove(jsonTmpPath)
 
-	outputBytes, err := exec.Command(tfComplianceBin, "-p", path, "-f", featuresPath).CombinedOutput()
-	outputString := stripansi.Strip(string(outputBytes))
+	// run the compliance tool against the created file
+	toolOutputBytes, err := exec.Command(tfComplianceBin, "-p", jsonTmpPath, "-f", featuresPath).CombinedOutput()
+	toolOutput := stripansi.Strip(string(toolOutputBytes))
+	if err != nil {
+		log.Printf("Tool execution failed: %v", err)
+		log.Printf("Tool output: \n%s\n", toolOutput)
+		return "", 0, fmt.Errorf("can't run '%s': %v\noutput: %s\n", tfComplianceBin, err, toolOutput)
+	}
 
-	for _, line := range strings.Split(outputString, "\n") {
+	// Parse the tool output into a ValidationLog entry.
+	record := ValidationLog{
+		DateTime:      time.Now().Format(time.ANSIC),
+		InputJson:     string(complianceToolInput),
+		Output:        toolOutput,
+		WasSuccessful: false,
+	}
+	for _, line := range strings.Split(toolOutput, "\n") {
 		scenarioCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
+
+		// "X scenarios (X passed, X failed, X skipped)"
 		count, err := fmt.Sscanf(line,
 			"%d scenarios (%d passed, %d failed, %d skipped)",
 			&scenarioCount, &passedCount, &failedCount, &skippedCount)
 
-		if err == nil && count == 4 {
-
+		if err != nil { // above failed, maybe "X scenarios (X passed, X skipped)"?
+			count, err = fmt.Sscanf(line,
+				"%d scenarios (%d passed, %d skipped)",
+				&scenarioCount, &passedCount, &skippedCount)
 		}
 
+		// if any of them match, parse into record and break the loop
+		if err == nil && count >= 3 {
+			record.WasSuccessful = true
+			record.FailedCount = failedCount
+			record.PassedCount = passedCount
+			record.SkippedCount = skippedCount
+			break
+		}
 	}
 
-	log.Printf(" === %s output ===", tfComplianceBin)
-	log.Printf(outputString)
-	log.Printf(" === end output ===")
-
-	if err != nil {
-		return outputString, 0, err
+	if record.WasSuccessful {
+		log.Printf("Validation result: %d scenarios passed, %d failed and %d skipped.",
+			record.PassedCount,
+			record.FailedCount,
+			record.SkippedCount)
+	} else {
+		log.Printf("Validation failed. The tool wasn't executed successfully.")
+		log.Printf("Tool output: \n%s", toolOutput)
 	}
 
-	return string(outputBytes), http.StatusOK, nil
+	// TODO: should add id to record?
+	// TODO: save in db
+	return toolOutput, http.StatusOK, nil
 }
 
 // List all features in the database.
