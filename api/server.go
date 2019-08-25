@@ -23,7 +23,7 @@ const (
 	featuresPath = "./features"
 )
 
-var db dynamoDBFeaturesTable
+var db dynamoDB
 
 func main() {
 	listenFlag := flag.String("listen", ":8080", "On which address to listen")
@@ -31,8 +31,8 @@ func main() {
 	flag.Parse()
 
 	log.Printf("Init DynamoDB table '%s'...", *dynamoTableFlag)
-	db = newDynamoDBFeaturesTable(*dynamoTableFlag)
-	if err := db.ensureTableExists(); err != nil {
+	db = newDynamoDB(*dynamoTableFlag)
+	if err := db.initTables(); err != nil {
 		log.Fatalf("Can't make dynamoDB table: %v", err)
 	}
 
@@ -121,6 +121,40 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	return string(prettyJSON.Bytes()), nil
 }
 
+// parseComplianceToolOutput parses compliance tool output into a ValidationLog struct.
+func parseComplianceToolOutput(inputJson, toolOutput string) *ValidationLog {
+	record := ValidationLog{
+		DateTime:      time.Now().Format(time.ANSIC),
+		InputJson:     inputJson,
+		Output:        toolOutput,
+		WasSuccessful: false,
+	}
+	for _, line := range strings.Split(toolOutput, "\n") {
+		scenarioCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
+
+		// "X scenarios (X passed, X failed, X skipped)"
+		count, err := fmt.Sscanf(line,
+			"%d scenarios (%d passed, %d failed, %d skipped)",
+			&scenarioCount, &passedCount, &failedCount, &skippedCount)
+
+		if err != nil { // above failed, maybe "X scenarios (X passed, X skipped)"?
+			count, err = fmt.Sscanf(line,
+				"%d scenarios (%d passed, %d skipped)",
+				&scenarioCount, &passedCount, &skippedCount)
+		}
+
+		// if any of them match, parse into record and break the loop
+		if err == nil && count >= 3 {
+			record.WasSuccessful = true
+			record.FailedCount = failedCount
+			record.PassedCount = passedCount
+			record.SkippedCount = skippedCount
+			break
+		}
+	}
+	return &record
+}
+
 // validateReq takes a base64 string in the body with the plan file content
 // or terraform json, run the tfComplianceBin tool against it, and responds
 // the tool output as a response.
@@ -167,36 +201,7 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 	}
 
 	// Parse the tool output into a ValidationLog entry.
-	record := ValidationLog{
-		DateTime:      time.Now().Format(time.ANSIC),
-		InputJson:     string(complianceToolInput),
-		Output:        toolOutput,
-		WasSuccessful: false,
-	}
-	for _, line := range strings.Split(toolOutput, "\n") {
-		scenarioCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
-
-		// "X scenarios (X passed, X failed, X skipped)"
-		count, err := fmt.Sscanf(line,
-			"%d scenarios (%d passed, %d failed, %d skipped)",
-			&scenarioCount, &passedCount, &failedCount, &skippedCount)
-
-		if err != nil { // above failed, maybe "X scenarios (X passed, X skipped)"?
-			count, err = fmt.Sscanf(line,
-				"%d scenarios (%d passed, %d skipped)",
-				&scenarioCount, &passedCount, &skippedCount)
-		}
-
-		// if any of them match, parse into record and break the loop
-		if err == nil && count >= 3 {
-			record.WasSuccessful = true
-			record.FailedCount = failedCount
-			record.PassedCount = passedCount
-			record.SkippedCount = skippedCount
-			break
-		}
-	}
-
+	record := parseComplianceToolOutput(string(complianceToolInput), toolOutput)
 	if record.WasSuccessful {
 		log.Printf("Validation result: %d scenarios passed, %d failed and %d skipped.",
 			record.PassedCount,
@@ -215,14 +220,14 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 
 // featuresReq responds the list of features actually on the database.
 func featuresReq(_ string, _ map[string]string) (string, int, error) {
-	features, err := db.loadAll()
+	features, err := db.loadAllFeatures()
 	if err != nil {
 		return "", 0, err
 	}
 
 	sb := strings.Builder{}
 	for _, f := range features {
-		sb.WriteString(f.FeatureName)
+		sb.WriteString(f.Id)
 		sb.WriteRune('\n')
 	}
 
@@ -236,13 +241,13 @@ func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
 		return "Illegal feature name.", http.StatusBadRequest, nil
 	}
 
-	features, err := db.loadAll()
+	features, err := db.loadAllFeatures()
 	if err != nil {
 		return "", 0, err
 	}
 
 	for _, f := range features {
-		if f.FeatureName == featureName {
+		if f.Id == featureName {
 			return f.FeatureSource, http.StatusOK, nil
 		}
 	}
@@ -257,7 +262,7 @@ func featureAddReq(body string, vars map[string]string) (string, int, error) {
 		return "Illegal feature name.", http.StatusBadRequest, nil
 	}
 
-	if err := db.insertOrUpdate(ComplianceFeature{featureName, body}); err != nil {
+	if err := db.insertOrUpdateFeature(ComplianceFeature{featureName, body}); err != nil {
 		return "", 0, err
 	}
 
@@ -284,7 +289,7 @@ func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 		return "Feature not found", http.StatusNotFound, nil
 	}
 
-	if err := db.removeByName(featureName); err != nil {
+	if err := db.removeFeature(featureName); err != nil {
 		return "", 0, err
 	}
 
@@ -311,12 +316,12 @@ func syncFeaturesFolderFromDB() error {
 	}
 
 	// Write all feature files
-	features, err := db.loadAll()
+	features, err := db.loadAllFeatures()
 	if err != nil {
 		return err
 	}
 	for _, f := range features {
-		filePath := featuresPath + "/" + f.FeatureName + ".feature"
+		filePath := featuresPath + "/" + f.Id + ".feature"
 		if err := ioutil.WriteFile(filePath, []byte(f.FeatureSource), os.ModePerm); err != nil {
 			return err
 		}
@@ -332,13 +337,13 @@ func validateFeatureName(name string) bool {
 
 // checkFeatureExists returns true if the given feature name exists in the database.
 func checkFeatureExists(name string) (bool, error) {
-	features, err := db.loadAll()
+	features, err := db.loadAllFeatures()
 	if err != nil {
 		return false, err
 	}
 
 	for _, f := range features {
-		if f.FeatureName == name {
+		if f.Id == name {
 			return true, nil
 		}
 	}

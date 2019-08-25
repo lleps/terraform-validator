@@ -1,6 +1,6 @@
 // This file provides an easy-to-use interface to store and
 // retrieve some defined items from a dynamoDB database, without
-// having to write dynamoDB-specific code.
+// having to worry about dynamo-specific code.
 
 package main
 
@@ -16,14 +16,17 @@ import (
 	"time"
 )
 
+// Item type definitions. Every persistent item should have an "Id"!
+
 // ComplianceFeature stores a feature to test terraform code against.
 type ComplianceFeature struct {
-	FeatureName   string
-	FeatureSource string
+	Id            string // name of the feature
+	FeatureSource string // gherkin source code of the feature
 }
 
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
+	Id            string // number of the log entry
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
 	Output        string // the compliance tool raw output
@@ -33,33 +36,52 @@ type ValidationLog struct {
 	PassedCount   int    // the number of scenarios passed (if WasSuccessful)
 }
 
-type dynamoDBFeaturesTable struct {
-	svc       *dynamodb.DynamoDB
-	tableName string
+// defines table names for each type
+const (
+	complianceFeatureTable = "features"
+	validationLogTable     = "logs"
+)
+
+// defines the attributes for each type, used to build projections in dynamo.
+var (
+	complianceFeatureAttributes = []string{"FeatureSource"}
+	validationLogAttributes     = []string{"InputJson", "Output", "WasSuccessful", "FailedCount", "SkippedCount", "PassedCount"}
+)
+
+type dynamoDB struct {
+	svc         *dynamodb.DynamoDB
+	tablePrefix string
 }
 
-// TODO: should not be feature-specific, as should also save logs.
-// newDynamoDBFeaturesTable creates a DynamoDB instance using the default aws authentication method.
-func newDynamoDBFeaturesTable(tableName string) dynamoDBFeaturesTable {
+// newDynamoDB creates a DynamoDB instance using the default aws authentication method.
+func newDynamoDB(tablePrefix string) dynamoDB {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	return dynamoDBFeaturesTable{dynamodb.New(sess), tableName}
+	return dynamoDB{dynamodb.New(sess), tablePrefix}
 }
 
-// ensureTableExists will create the DynamoDB table if it does not exists.
-func (ddb dynamoDBFeaturesTable) ensureTableExists() error {
+// Generic table methods. Those should not be used outside this file.
+// Instead, type-specific methods (defined below) should be used.
+
+// tableFor returns the full dynamoDB table ({prefix}_{name}).
+func (ddb dynamoDB) tableFor(name string) string {
+	return ddb.tablePrefix + "_" + name
+}
+
+// initTable creates tableName on the given dynamoDB session if it does not exists.
+func (ddb dynamoDB) initTable(tableName string) error {
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
-				AttributeName: aws.String("FeatureName"),
+				AttributeName: aws.String("Id"),
 				AttributeType: aws.String("S"),
 			},
 		},
 		KeySchema: []*dynamodb.KeySchemaElement{
 			{
-				AttributeName: aws.String("FeatureName"),
+				AttributeName: aws.String("Id"),
 				KeyType:       aws.String("HASH"),
 			},
 		},
@@ -67,7 +89,7 @@ func (ddb dynamoDBFeaturesTable) ensureTableExists() error {
 			ReadCapacityUnits:  aws.Int64(5),
 			WriteCapacityUnits: aws.Int64(5),
 		},
-		TableName: aws.String(ddb.tableName),
+		TableName: aws.String(tableName),
 	}
 
 	_, err := ddb.svc.CreateTable(input)
@@ -81,24 +103,24 @@ func (ddb dynamoDBFeaturesTable) ensureTableExists() error {
 	} else {
 		// The table is being created. If an upcoming query to this table follows this
 		// call immediately, may fail because the table is not yet created. Wait a few seconds.
-		log.Printf("Sleep 10 sec to wait until table '%s' is created in DynamoDB...", ddb.tableName)
-		time.Sleep(10 * time.Second)
+		log.Printf("Sleep 5 sec to wait until table '%s' is created in DynamoDB...", tableName)
+		time.Sleep(5 * time.Second)
 		log.Printf("Done!")
 	}
 
 	return nil
 }
 
-// insertOrUpdate inserts or updates the given feature on the table.
-func (ddb dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error {
-	av, err := dynamodbattribute.MarshalMap(feature)
+// insertOrUpdateGeneric inserts or updates the given item on the table.
+func (ddb dynamoDB) insertOrUpdateGeneric(tableName string, item interface{}) error {
+	av, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
 		return err
 	}
 
 	input := &dynamodb.PutItemInput{
 		Item:      av,
-		TableName: aws.String(ddb.tableName),
+		TableName: aws.String(tableName),
 	}
 	_, err = ddb.svc.PutItem(input)
 	if err != nil {
@@ -108,54 +130,52 @@ func (ddb dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error
 	return nil
 }
 
-// loadAll returns all features currently in the table.
-func (ddb dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
-	// Create a projection (which "columns" we want to read)
-	proj := expression.NamesList(expression.Name("FeatureName"), expression.Name("FeatureSource"))
-	expr, err := expression.NewBuilder().WithProjection(proj).Build()
-	if err != nil {
-		return nil, err
+// loadAllGeneric provides a generic way to load all items from a table.
+func (ddb dynamoDB) loadAllGeneric(
+	tableName string,
+	attributes []string, // list of the item attribute names (apart from "Id")
+	onItemLoaded func(map[string]*dynamodb.AttributeValue) error, // called for each loaded item
+) error {
+	projection := expression.NamesList(expression.Name("Id"))
+	for _, attr := range attributes {
+		projection = projection.AddNames(expression.Name(attr))
 	}
 
-	// Build the query
+	expr, err := expression.NewBuilder().WithProjection(projection).Build()
+	if err != nil {
+		return err
+	}
+
 	params := &dynamodb.ScanInput{
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		FilterExpression:          expr.Filter(),
 		ProjectionExpression:      expr.Projection(),
-		TableName:                 aws.String(ddb.tableName),
+		TableName:                 aws.String(tableName),
 	}
 
-	// Exec the request
 	result, err := ddb.svc.Scan(params)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// parse result into []ComplianceFeature
-	var featuresParsed []ComplianceFeature
 	for _, i := range result.Items {
-		item := ComplianceFeature{}
-		err = dynamodbattribute.UnmarshalMap(i, &item)
-		if err != nil {
-			return nil, err
+		if err := onItemLoaded(i); err != nil {
+			return nil
 		}
-
-		featuresParsed = append(featuresParsed, item)
 	}
-
-	return featuresParsed, nil
+	return nil
 }
 
-// removeByName removes all features whose FeatureName equals name.
-func (ddb dynamoDBFeaturesTable) removeByName(name string) error {
+// removeGeneric removes all the items in the given table whose Id equals id.
+func (ddb dynamoDB) removeGeneric(tableName string, id string) error {
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			"FeatureName": {
-				S: aws.String(name),
+			"Id": {
+				S: aws.String(id),
 			},
 		},
-		TableName: aws.String(ddb.tableName),
+		TableName: aws.String(tableName),
 	}
 
 	_, err := ddb.svc.DeleteItem(input)
@@ -164,4 +184,73 @@ func (ddb dynamoDBFeaturesTable) removeByName(name string) error {
 	}
 
 	return nil
+}
+
+// Type-Specific method definitions.
+
+// initTables will ensure all the necessary DynamoDB tables exists.
+func (ddb dynamoDB) initTables() error {
+	if err := ddb.initTable(ddb.tableFor(complianceFeatureTable)); err != nil {
+		return err
+	}
+	if err := ddb.initTable(ddb.tableFor(validationLogTable)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// insertOrUpdateFeature inserts or updates the given feature on the database.
+func (ddb dynamoDB) insertOrUpdateFeature(feature ComplianceFeature) error {
+	return ddb.insertOrUpdateGeneric(ddb.tableFor(complianceFeatureTable), feature)
+}
+
+// insertOrUpdateValidationLog inserts or updates the given validation log on the database.
+func (ddb dynamoDB) insertOrUpdateValidationLog(validationLog ValidationLog) error {
+	return ddb.insertOrUpdateGeneric(ddb.tableFor(validationLogTable), validationLog)
+}
+
+// loadAllFeatures returns all the ComplianceFeature items on the database.
+func (ddb dynamoDB) loadAllFeatures() ([]ComplianceFeature, error) {
+	var features []ComplianceFeature
+	err := ddb.loadAllGeneric(
+		ddb.tableFor(complianceFeatureTable),
+		complianceFeatureAttributes,
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem ComplianceFeature
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				features = append(features, elem)
+			}
+			return err
+		})
+
+	return features, err
+}
+
+// loadAllValidationLogs returns all the ValidationLog items on the database.
+func (ddb dynamoDB) loadAllValidationLogs() ([]ValidationLog, error) {
+	var validationLogs []ValidationLog
+	err := ddb.loadAllGeneric(
+		ddb.tableFor(validationLogTable),
+		validationLogAttributes,
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem ValidationLog
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				validationLogs = append(validationLogs, elem)
+			}
+			return err
+		})
+
+	return validationLogs, err
+}
+
+// removeFeature removes the first feature whose Id is id.
+func (ddb dynamoDB) removeFeature(id string) error {
+	return ddb.removeGeneric(ddb.tableFor(complianceFeatureTable), id)
+}
+
+// removeValidationLog removes the first validation log whose Id is id.
+func (ddb dynamoDB) removeValidationLog(id string) error {
+	return ddb.removeGeneric(ddb.tableFor(validationLogTable), id)
 }

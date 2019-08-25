@@ -6,6 +6,7 @@ import (
 )
 
 // TestDynamoDB tests the whole thing on a real AWS DynamoDB.
+// Note: only persistence for features is tested.
 // Steps:
 // 1. Insertion: Inserts a few features on DB.
 // 2. Loading: Load all the inserted features (and check if they match the inserted ones)
@@ -21,56 +22,57 @@ func TestDynamoDB(t *testing.T) {
 
 	// 1. Insertion
 	features := []ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
-	ddb := newDynamoDBFeaturesTable("tf-compliance-features-test")
-	if err := ddb.ensureTableExists(); err != nil {
+	ddb := newDynamoDB("terraform-validator-test")
+	if err := ddb.initTables(); err != nil {
 		t.Fatalf("ensureTableExists: %v", err)
 	}
 
 	for _, f := range features {
-		if err := ddb.insertOrUpdate(f); err != nil {
+		if err := ddb.insertOrUpdateFeature(f); err != nil {
 			t.Fatalf("inserting: %v", err)
 		}
 	}
 
 	// 2. Loading
-	loadedFeatures, err := ddb.loadAll()
+	loadedFeatures, err := ddb.loadAllFeatures()
 	if err != nil {
 		log.Fatalf("loading: %v", err)
 	}
-	assertFeaturesMatch(features, loadedFeatures, t)
+	assertFeaturesMatch(features, loadedFeatures, "loading", t)
 
 	// 3. Removing
-	if err := ddb.removeByName("abc"); err != nil {
+	if err := ddb.removeFeature("abc"); err != nil {
 		t.Fatalf("removing: %v", err)
 	}
 	features = features[1:]
 
 	// 4. Removing check
-	loadedFeatures, err = ddb.loadAll()
+	loadedFeatures, err = ddb.loadAllFeatures()
 	if err != nil {
 		log.Fatalf("removing check: %v", err)
 	}
-	assertFeaturesMatch(features, loadedFeatures, t)
+	assertFeaturesMatch(features, loadedFeatures, "removing check", t)
 
 	// 5. Updating
 	features[0] = ComplianceFeature{"jjj", "999"}
-	if err := ddb.insertOrUpdate(features[0]); err != nil {
+	if err := ddb.insertOrUpdateFeature(features[0]); err != nil {
 		log.Fatalf("update: %v", err)
 	}
 
 	// 6. Updating check
-	loadedFeatures, err = ddb.loadAll()
+	loadedFeatures, err = ddb.loadAllFeatures()
 	if err != nil {
 		log.Fatalf("update check: %v", err)
 	}
-	assertFeaturesMatch(features, loadedFeatures, t)
+	assertFeaturesMatch(features, loadedFeatures, "update check", t)
 }
 
-func assertFeaturesMatch(expected []ComplianceFeature, actual []ComplianceFeature, t *testing.T) {
+func assertFeaturesMatch(expected []ComplianceFeature, actual []ComplianceFeature, msg string, t *testing.T) {
 	if len(expected) != len(actual) {
-		t.Fatalf("len(expected): %d != len(actual): %d.\n"+
+		t.Fatalf("%s: \nlen(expected): %d != len(actual): %d.\n"+
 			"expected: %v\n"+
 			"actual: %v",
+			msg,
 			len(expected), len(actual),
 			expected,
 			actual)
@@ -78,7 +80,7 @@ func assertFeaturesMatch(expected []ComplianceFeature, actual []ComplianceFeatur
 
 	for i, f := range expected {
 		if f != actual[i] {
-			t.Errorf("Feature mismatch at idx %d. Expected: %v. Actual: %v", i, f, actual[i])
+			t.Errorf("%s:\nFeature mismatch at idx %d. Expected: %v. Actual: %v", msg, i, f, actual[i])
 		}
 	}
 }
