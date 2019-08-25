@@ -206,6 +206,7 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		log.Printf("Tool output: \n%s", toolOutput)
 	}
 
+	// TODO:split into directories. api, cli.
 	// TODO: should add id to record?
 	// TODO: save in db
 	return toolOutput, http.StatusOK, nil
@@ -255,7 +256,7 @@ func featureAddReq(body string, vars map[string]string) (string, int, error) {
 		return "Illegal feature name.", http.StatusBadRequest, nil
 	}
 
-	if err := db.insertOrUpdate(ComplianceFeature{ featureName, body }); err != nil {
+	if err := db.insertOrUpdate(ComplianceFeature{featureName, body}); err != nil {
 		return "", 0, err
 	}
 
@@ -292,7 +293,6 @@ func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 
 	return "", http.StatusOK, nil
 }
-
 
 // This writes all the .feature files (required by compliance) in
 // the features folder, based on the content from the DB.

@@ -20,13 +20,13 @@ type ComplianceFeature struct {
 
 // Layout of a validation record entry in the table.
 type ValidationLog struct {
-	DateTime string // when this plan was validated
-	InputJson string // the plan file json
-	Output string // the compliance tool raw output
-	WasSuccessful bool // if the compliance tool executed properly
-	FailedCount int // the number of scenarios failed (if WasSuccessful)
-	SkippedCount int // the number of scenarios skipped (if WasSuccessful)
-	PassedCount int // the number of scenarios passed (if WasSuccessful)
+	DateTime      string // when this plan was validated
+	InputJson     string // the plan file json
+	Output        string // the compliance tool raw output
+	WasSuccessful bool   // if the compliance tool executed properly
+	FailedCount   int    // the number of scenarios failed (if WasSuccessful)
+	SkippedCount  int    // the number of scenarios skipped (if WasSuccessful)
+	PassedCount   int    // the number of scenarios passed (if WasSuccessful)
 }
 
 // Easy-to-use interface to persist ComplianceFeature items on a dynamoDB table.

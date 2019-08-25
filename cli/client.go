@@ -39,7 +39,7 @@ func main() {
 	} else if *listFeaturesFlag { // --list-features
 		resContent, resCode, resErr = execRequest(host, "/features", "GET", "")
 	} else if *featureSourceFlag != "" { // --list-features
-		resContent, resCode, resErr = execRequest(host, "/features/source/" + *featureSourceFlag, "GET", "")
+		resContent, resCode, resErr = execRequest(host, "/features/source/"+*featureSourceFlag, "GET", "")
 	} else if *addFeatureFlag != "" { // --add-feature
 		content, err := ioutil.ReadFile(*addFeatureFlag)
 		if err != nil {
@@ -60,11 +60,11 @@ func main() {
 				fmt.Printf("Feature '%s' already exists. Pass --replace to overwrite it.\n", featureName)
 				return
 			}
-			resContent, resCode, resErr = execRequest(host, "/features/add/" + featureName, "POST", string(content))
+			resContent, resCode, resErr = execRequest(host, "/features/add/"+featureName, "POST", string(content))
 		}
 	} else if *removeFeatureFlag != "" { // --remove-feature
 		fileWithoutExt := strings.TrimSuffix(*removeFeatureFlag, ".feature")
-		resContent, resCode, resErr = execRequest(host, "/features/remove/" + fileWithoutExt, "DELETE", "")
+		resContent, resCode, resErr = execRequest(host, "/features/remove/"+fileWithoutExt, "DELETE", "")
 	} else {
 		fmt.Println("No option given. Check -h to see options.")
 		return
