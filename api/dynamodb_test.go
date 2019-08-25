@@ -5,7 +5,8 @@ import (
 	"testing"
 )
 
-// This tests the whole thing on a real AWS dynamo DB.
+// TestDynamoDB tests the whole thing on a real AWS DynamoDB.
+// Steps:
 // 1. Insertion: Inserts a few features on DB.
 // 2. Loading: Load all the inserted features (and check if they match the inserted ones)
 // 3. Removing: Remove one of the features.
@@ -13,6 +14,11 @@ import (
 // 5. Updating: Change the source of a feature.
 // 6. Updating check: Load the feature and see if the source changed.
 func TestDynamoDB(t *testing.T) {
+	if testing.Short() {
+		t.Skipf("Don't run full DynamoDB test when short")
+		return
+	}
+
 	// 1. Insertion
 	features := []ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
 	ddb := newDynamoDBFeaturesTable("tf-compliance-features-test")
@@ -31,7 +37,7 @@ func TestDynamoDB(t *testing.T) {
 	if err != nil {
 		log.Fatalf("loading: %v", err)
 	}
-	compareFeaturesOrFatal(features, loadedFeatures, t)
+	assertFeaturesMatch(features, loadedFeatures, t)
 
 	// 3. Removing
 	if err := ddb.removeByName("abc"); err != nil {
@@ -44,7 +50,7 @@ func TestDynamoDB(t *testing.T) {
 	if err != nil {
 		log.Fatalf("removing check: %v", err)
 	}
-	compareFeaturesOrFatal(features, loadedFeatures, t)
+	assertFeaturesMatch(features, loadedFeatures, t)
 
 	// 5. Updating
 	features[0] = ComplianceFeature{"jjj", "999"}
@@ -57,10 +63,10 @@ func TestDynamoDB(t *testing.T) {
 	if err != nil {
 		log.Fatalf("update check: %v", err)
 	}
-	compareFeaturesOrFatal(features, loadedFeatures, t)
+	assertFeaturesMatch(features, loadedFeatures, t)
 }
 
-func compareFeaturesOrFatal(expected []ComplianceFeature, actual []ComplianceFeature, t *testing.T) {
+func assertFeaturesMatch(expected []ComplianceFeature, actual []ComplianceFeature, t *testing.T) {
 	if len(expected) != len(actual) {
 		t.Fatalf("len(expected): %d != len(actual): %d.\n"+
 			"expected: %v\n"+

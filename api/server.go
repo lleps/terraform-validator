@@ -17,9 +17,11 @@ import (
 	"time"
 )
 
-const tfComplianceBin = "terraform-compliance"
-const tfBin = "terraform"
-const featuresPath = "./features"
+const (
+	tfComplianceBin = "terraform-compliance"
+	tfBin = "terraform"
+	featuresPath = "./features"
+)
 
 var db dynamoDBFeaturesTable
 
@@ -50,7 +52,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(*listenFlag, nil))
 }
 
-// Register in the router a request with proper error handling and logging.
+// registerRequest registers in the router an HTTP request with proper error handling and logging.
 func registerRequest(
 	router *mux.Router,
 	endpoint string,
@@ -93,8 +95,8 @@ func registerRequest(
 	}).Methods(method)
 }
 
-// Converts a TF file state (like plan.out, or terraform.tfstate) to pretty json
-// using "terraform show -json {file}".
+// convertTerraformBinToJson converts a TF file state (like plan.out) to a
+// pretty json string by invoking internally "terraform show -json".
 // Doesn't supports concurrent access, as uses a hardcoded temporary file.
 func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	// write the bytes to a tmp file
@@ -105,9 +107,9 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	defer os.Remove(path)
 
 	// invoke the tool on that file
-	outputBytes, err := exec.Command(tfBin, "show", "-json", path).Output()
+	outputBytes, err := exec.Command(tfBin, "show", "-json", path).CombinedOutput()
 	if err != nil || string(outputBytes) == "" {
-		return "", fmt.Errorf("can't exec the tool: %v", err)
+		return "", fmt.Errorf("can't exec the tool: %v. out: %s", err, string(outputBytes))
 	}
 
 	// prettify the json
@@ -117,12 +119,11 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	}
 
 	return string(prettyJSON.Bytes()), nil
-
 }
 
-// Takes a base64 string in the body with the plan file content,
-// run terraform-compliance against the file, and returns the
-// raw tool output as a response.
+// validateReq takes a base64 string in the body with the plan file content
+// or terraform json, run the tfComplianceBin tool against it, and responds
+// the tool output as a response.
 func validateReq(body string, _ map[string]string) (string, int, error) {
 	planFileBytes, err := base64.StdEncoding.DecodeString(body)
 	if err != nil {
@@ -212,7 +213,7 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 	return toolOutput, http.StatusOK, nil
 }
 
-// List all features in the database.
+// featuresReq responds the list of features actually on the database.
 func featuresReq(_ string, _ map[string]string) (string, int, error) {
 	features, err := db.loadAll()
 	if err != nil {
@@ -228,7 +229,7 @@ func featuresReq(_ string, _ map[string]string) (string, int, error) {
 	return sb.String(), http.StatusOK, nil
 }
 
-// Get the source code of the given feature and returns it.
+// featureSourceReq responds the source code of the given feature.
 func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
 	featureName := vars["name"]
 	if !validateFeatureName(featureName) {
@@ -249,7 +250,7 @@ func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
 	return "Feature not found", http.StatusNotFound, nil
 }
 
-// Add a new feature, with the source code specified in the body.
+// featureAddReq adds a new feature in the database, with the source code specified in the body.
 func featureAddReq(body string, vars map[string]string) (string, int, error) {
 	featureName := vars["name"]
 	if !validateFeatureName(featureName) {
@@ -267,7 +268,7 @@ func featureAddReq(body string, vars map[string]string) (string, int, error) {
 	return "", http.StatusOK, nil
 }
 
-// Remove the feature with the given name.
+// featureRemoveReq removes a feature from the database.
 func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 	featureName := vars["name"]
 	if !validateFeatureName(featureName) {
@@ -294,8 +295,7 @@ func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 	return "", http.StatusOK, nil
 }
 
-// This writes all the .feature files (required by compliance) in
-// the features folder, based on the content from the DB.
+// syncFeaturesFolderFromDB writes all the features in the database onto featuresPath.
 func syncFeaturesFolderFromDB() error {
 	// Empty the folder
 	if err := os.RemoveAll(featuresPath); err != nil {
@@ -325,12 +325,12 @@ func syncFeaturesFolderFromDB() error {
 	return nil
 }
 
-// Returns true if the feature name is ok (doesn't contains invalid file characters)
+// validateFeatureName returns true if the given feature name is valid (doesn't contains invalid file characters).
 func validateFeatureName(name string) bool {
 	return !strings.ContainsAny(name, "./* ")
 }
 
-// Returns true if the given feature name exists in the DB, false otherwise.
+// checkFeatureExists returns true if the given feature name exists in the database.
 func checkFeatureExists(name string) (bool, error) {
 	features, err := db.loadAll()
 	if err != nil {

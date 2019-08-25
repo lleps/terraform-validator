@@ -6,6 +6,11 @@ import (
 )
 
 func TestConvertTerraformBinToJson(t *testing.T) {
+	if testing.Short() {
+		t.Skipf("Don't test tfbin->json when short")
+		return
+	}
+
 	planBytes, err := base64.StdEncoding.DecodeString(planDataB64)
 	if err != nil {
 		t.Fatalf("can't decode plan data: %v", err)

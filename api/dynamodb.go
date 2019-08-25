@@ -1,3 +1,7 @@
+// This file provides an easy-to-use interface to store and
+// retrieve some defined items from a dynamoDB database, without
+// having to write dynamoDB-specific code.
+
 package main
 
 import (
@@ -12,13 +16,13 @@ import (
 	"time"
 )
 
-// Layout of a feature entry in the table.
+// ComplianceFeature stores a feature to test terraform code against.
 type ComplianceFeature struct {
 	FeatureName   string
 	FeatureSource string
 }
 
-// Layout of a validation record entry in the table.
+// ValidationLog stores a validation event information.
 type ValidationLog struct {
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
@@ -29,13 +33,13 @@ type ValidationLog struct {
 	PassedCount   int    // the number of scenarios passed (if WasSuccessful)
 }
 
-// Easy-to-use interface to persist ComplianceFeature items on a dynamoDB table.
 type dynamoDBFeaturesTable struct {
 	svc       *dynamodb.DynamoDB
 	tableName string
 }
 
-// Create a DynamoDB instance using the default aws authentication method.
+// TODO: should not be feature-specific, as should also save logs.
+// newDynamoDBFeaturesTable creates a DynamoDB instance using the default aws authentication method.
 func newDynamoDBFeaturesTable(tableName string) dynamoDBFeaturesTable {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -44,10 +48,8 @@ func newDynamoDBFeaturesTable(tableName string) dynamoDBFeaturesTable {
 	return dynamoDBFeaturesTable{dynamodb.New(sess), tableName}
 }
 
-// Ensure the table exists in dynamo. If it doesn't, create it. Otherwise NOP.
+// ensureTableExists will create the DynamoDB table if it does not exists.
 func (ddb dynamoDBFeaturesTable) ensureTableExists() error {
-
-	// create table schema, only 2 string fields
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
@@ -87,7 +89,7 @@ func (ddb dynamoDBFeaturesTable) ensureTableExists() error {
 	return nil
 }
 
-// Inserts or update the given feature on the table.
+// insertOrUpdate inserts or updates the given feature on the table.
 func (ddb dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error {
 	av, err := dynamodbattribute.MarshalMap(feature)
 	if err != nil {
@@ -106,9 +108,8 @@ func (ddb dynamoDBFeaturesTable) insertOrUpdate(feature ComplianceFeature) error
 	return nil
 }
 
-// Load all the features stored on this table.
+// loadAll returns all features currently in the table.
 func (ddb dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
-
 	// Create a projection (which "columns" we want to read)
 	proj := expression.NamesList(expression.Name("FeatureName"), expression.Name("FeatureSource"))
 	expr, err := expression.NewBuilder().WithProjection(proj).Build()
@@ -146,7 +147,7 @@ func (ddb dynamoDBFeaturesTable) loadAll() ([]ComplianceFeature, error) {
 	return featuresParsed, nil
 }
 
-// Remove from this table the feature with the given name (if any). Otherwise, NOP.
+// removeByName removes all features whose FeatureName equals name.
 func (ddb dynamoDBFeaturesTable) removeByName(name string) error {
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
