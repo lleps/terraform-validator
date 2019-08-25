@@ -1,6 +1,7 @@
 # don't keep tf stuff. Just the go code
 *.tf
 *.tf.save
+plan.out
 terraform.tfstate
 terraform.tfstate.backup
 
