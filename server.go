@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/acarl005/stripansi"
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"log"
@@ -14,14 +17,14 @@ import (
 )
 
 const tfComplianceBin = "terraform-compliance"
+const tfBin = "terraform"
 const featuresPath = "./features"
-const planTmpFile = "tmp_plan.out"
 
 var db dynamoDBFeaturesTable
 
 func main() {
 	listenFlag := flag.String("listen", ":8080", "On which address to listen")
-	dynamoTableFlag := flag.String("dynamodb-features-table", "terraform-validator/features", "The dynamoDB table to use")
+	dynamoTableFlag := flag.String("dynamodb-features-table", "terraform-validator.features", "The dynamoDB table to use")
 	flag.Parse()
 
 	log.Printf("Init DynamoDB table '%s'...", *dynamoTableFlag)
@@ -89,6 +92,33 @@ func registerRequest(
 	}).Methods(method)
 }
 
+// Converts a TF file state (like plan.out, or terraform.tfstate) to pretty json
+// using "terraform show -json {file}".
+// Doesn't supports concurrent access, as uses a hardcoded temporary file.
+func convertTerraformBinToJson(fileBytes []byte) (string, error) {
+	// write the bytes to a tmp file
+	path := os.TempDir() + "/" + "convertTfToJson.bin.tmp"
+	if err := ioutil.WriteFile(path, fileBytes, os.ModePerm); err != nil {
+		return "", fmt.Errorf("can't create tmp file '%s': %v", path, err)
+	}
+	defer os.Remove(path)
+
+	// invoke the tool on that file
+	outputBytes, err := exec.Command(tfBin, "show", "-json", path).Output()
+	if err != nil || string(outputBytes) == "" {
+		return "", fmt.Errorf("can't exec the tool: %v", err)
+	}
+
+	// prettify the json
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, outputBytes, "", "\t"); err != nil {
+		return "", fmt.Errorf("can't prettify the json: %v", err)
+	}
+
+	return string(prettyJSON.Bytes()), nil
+
+}
+
 // Takes a base64 string in the body with the plan file content,
 // run terraform-compliance against the file, and returns the
 // raw tool output as a response.
@@ -98,13 +128,28 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
-	err = ioutil.WriteFile(planTmpFile, planFileBytes, os.ModePerm)
+	path := os.TempDir() + "/" + "compliance_plan.out"
+	err = ioutil.WriteFile(path, planFileBytes, os.ModePerm)
 	if err != nil {
 		return "", 0, err
 	}
+	defer os.Remove(path)
 
-	outputBytes, err := exec.Command(tfComplianceBin, "-p", planTmpFile, "-f", featuresPath).CombinedOutput()
-	outputString := string(outputBytes)
+	outputBytes, err := exec.Command(tfComplianceBin, "-p", path, "-f", featuresPath).CombinedOutput()
+	outputString := stripansi.Strip(string(outputBytes))
+
+	for _, line := range strings.Split(outputString, "\n") {
+		scenarioCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
+		count, err := fmt.Sscanf(line,
+			"%d scenarios (%d passed, %d failed, %d skipped)",
+			&scenarioCount, &passedCount, &failedCount, &skippedCount)
+
+		if err == nil && count == 4 {
+
+		}
+
+	}
+
 	log.Printf(" === %s output ===", tfComplianceBin)
 	log.Printf(outputString)
 	log.Printf(" === end output ===")
