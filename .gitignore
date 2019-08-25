@@ -1,0 +1,6 @@
+# don't keep tf stuff. Just the go code
+*.tf
+*.tf.save
+terraform.tfstate
+terraform.tfstate.backup
+
