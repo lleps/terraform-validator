@@ -22,7 +22,7 @@ func TestDynamoDB(t *testing.T) {
 
 	// 1. Insertion
 	features := []ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
-	ddb := newDynamoDB("terraform-validator-test")
+	ddb := newDynamoDB("terraformvalidator_test")
 	if err := ddb.initTables(); err != nil {
 		t.Fatalf("ensureTableExists: %v", err)
 	}

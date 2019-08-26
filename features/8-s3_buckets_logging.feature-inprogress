@@ -1,7 +1,0 @@
-Feature: S3 buckets should have server and access logging enabled
-     
-    Scenario: Upon creation S3 buckets should have logging
-        
-      Given I have s3_bucket resource configured
-        
-      Then it must contain logging property

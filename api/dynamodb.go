@@ -45,7 +45,7 @@ const (
 // defines the attributes for each type, used to build projections in dynamo.
 var (
 	complianceFeatureAttributes = []string{"FeatureSource"}
-	validationLogAttributes     = []string{"InputJson", "Output", "WasSuccessful", "FailedCount", "SkippedCount", "PassedCount"}
+	validationLogAttributes     = []string{"DateTime", "InputJson", "Output", "WasSuccessful", "FailedCount", "SkippedCount", "PassedCount"}
 )
 
 type dynamoDB struct {

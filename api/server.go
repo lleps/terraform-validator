@@ -20,15 +20,15 @@ import (
 
 const (
 	tfComplianceBin = "terraform-compliance"
-	tfBin = "terraform"
-	featuresPath = "./features"
+	tfBin           = "terraform"
+	featuresPath    = "./features"
 )
 
 var db dynamoDB
 
 func main() {
 	listenFlag := flag.String("listen", ":8080", "On which address to listen")
-	dynamoTableFlag := flag.String("dynamodb-features-table", "terraform-validator.features", "The dynamoDB table to use")
+	dynamoTableFlag := flag.String("dynamodb-features-table", "terraformvalidator", "The dynamoDB table prefix to use")
 	flag.Parse()
 
 	log.Printf("Init DynamoDB table '%s'...", *dynamoTableFlag)
@@ -129,17 +129,18 @@ func parseComplianceToolOutput(output string, record *ValidationLog) {
 	record.WasSuccessful = false
 
 	for _, line := range strings.Split(output, "\n") {
-		scenarioCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
+		featureCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
 
-		// "X scenarios (X passed, X failed, X skipped)"
+		// "X features (X passed, X failed, X skipped)"
 		count, err := fmt.Sscanf(line,
-			"%d scenarios (%d passed, %d failed, %d skipped)",
-			&scenarioCount, &passedCount, &failedCount, &skippedCount)
+			"%d features (%d passed, %d failed, %d skipped)",
+			&featureCount, &passedCount, &failedCount, &skippedCount)
 
-		if err != nil { // above failed, maybe "X scenarios (X passed, X skipped)"?
+		if err != nil { // above failed, maybe "X features (X passed, X skipped)"?
 			count, err = fmt.Sscanf(line,
-				"%d scenarios (%d passed, %d skipped)",
-				&scenarioCount, &passedCount, &skippedCount)
+				"%d features (%d passed, %d skipped)",
+				&featureCount, &passedCount, &skippedCount)
+			failedCount = 0
 		}
 
 		// if any of them match, parse into record and break the loop
@@ -213,10 +214,10 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 
 	// log record
 	record := ValidationLog{
-		Id:            strconv.Itoa(maxId + 1),
-		DateTime:      time.Now().Format(time.ANSIC),
-		InputJson:     string(complianceToolInput),
-		Output:        toolOutput,
+		Id:        strconv.Itoa(maxId + 1),
+		DateTime:  time.Now().Format(time.ANSIC),
+		InputJson: string(complianceToolInput),
+		Output:    toolOutput,
 	}
 	parseComplianceToolOutput(toolOutput, &record)
 	if record.WasSuccessful {
@@ -318,7 +319,6 @@ func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 	return "", http.StatusOK, nil
 }
 
-
 // logsReq responds the list of log entries in the database.
 func logsReq(_ string, _ map[string]string) (string, int, error) {
 	logs, err := db.loadAllValidationLogs()
@@ -326,13 +326,23 @@ func logsReq(_ string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
+	// reverse output
+	for i, j := 0, len(logs)-1; i < j; i, j = i+1, j-1 {
+		logs[i], logs[j] = logs[j], logs[i]
+	}
+
+	// build response
 	sb := strings.Builder{}
 	for _, l := range logs {
 		if l.WasSuccessful {
-			sb.WriteString(fmt.Sprintf("#%s - %s - successful (%d passed, %d failed, %d skipped)",
-				l.Id, l.DateTime, l.PassedCount, l.FailedCount, l.SkippedCount))
+			state := "successful"
+			if l.FailedCount > 0 {
+				state = "failed"
+			}
+			sb.WriteString(fmt.Sprintf("#%s - %s - %s (%d passed, %d failed, %d skipped)",
+				l.Id, l.DateTime, state, l.PassedCount, l.FailedCount, l.SkippedCount))
 		} else {
-			sb.WriteString(fmt.Sprintf("#%s - %s - failed. skipped)",
+			sb.WriteString(fmt.Sprintf("#%s - %s - can't execute)",
 				l.Id, l.DateTime))
 		}
 		sb.WriteRune('\n')
@@ -340,7 +350,6 @@ func logsReq(_ string, _ map[string]string) (string, int, error) {
 
 	return sb.String(), http.StatusOK, nil
 }
-
 
 // logsGetReq responds the content of the log with the given id.
 func logsGetReq(_ string, vars map[string]string) (string, int, error) {
