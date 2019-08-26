@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -122,14 +123,10 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 }
 
 // parseComplianceToolOutput parses compliance tool output into a ValidationLog struct.
-func parseComplianceToolOutput(inputJson, toolOutput string) *ValidationLog {
-	record := ValidationLog{
-		DateTime:      time.Now().Format(time.ANSIC),
-		InputJson:     inputJson,
-		Output:        toolOutput,
-		WasSuccessful: false,
-	}
-	for _, line := range strings.Split(toolOutput, "\n") {
+func parseComplianceToolOutput(output string, record *ValidationLog) {
+	record.WasSuccessful = false
+
+	for _, line := range strings.Split(output, "\n") {
 		scenarioCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
 
 		// "X scenarios (X passed, X failed, X skipped)"
@@ -152,7 +149,6 @@ func parseComplianceToolOutput(inputJson, toolOutput string) *ValidationLog {
 			break
 		}
 	}
-	return &record
 }
 
 // validateReq takes a base64 string in the body with the plan file content
@@ -200,8 +196,27 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		return "", 0, fmt.Errorf("can't run '%s': %v\noutput: %s\n", tfComplianceBin, err, toolOutput)
 	}
 
-	// Parse the tool output into a ValidationLog entry.
-	record := parseComplianceToolOutput(string(complianceToolInput), toolOutput)
+	// Calculate an ID for the validation
+	maxId := 0
+	records, err := db.loadAllValidationLogs()
+	if err != nil {
+		return "", 0, err
+	}
+	for _, record := range records {
+		recordId, _ := strconv.ParseInt(record.Id, 10, 64)
+		if int(recordId) > maxId {
+			maxId = int(recordId)
+		}
+	}
+
+	// log record
+	record := ValidationLog{
+		Id:            strconv.Itoa(maxId + 1),
+		DateTime:      time.Now().Format(time.ANSIC),
+		InputJson:     string(complianceToolInput),
+		Output:        toolOutput,
+	}
+	parseComplianceToolOutput(toolOutput, &record)
 	if record.WasSuccessful {
 		log.Printf("Validation result: %d scenarios passed, %d failed and %d skipped.",
 			record.PassedCount,
@@ -212,9 +227,10 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		log.Printf("Tool output: \n%s", toolOutput)
 	}
 
-	// TODO:split into directories. api, cli.
-	// TODO: should add id to record?
-	// TODO: save in db
+	if err := db.insertOrUpdateValidationLog(record); err != nil {
+		return "", 0, fmt.Errorf("can't put record in db: %v", err)
+	}
+
 	return toolOutput, http.StatusOK, nil
 }
 
