@@ -7,7 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/acarl005/stripansi"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gorilla/mux"
+
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -51,8 +56,31 @@ func main() {
 	registerRequest(r, "/features/remove/{name}", featureRemoveReq, "DELETE")
 	registerRequest(r, "/logs", logsReq, "GET")
 	registerRequest(r, "/logs/{id}", logsGetReq, "GET")
+
+	ticker := time.NewTicker(10 * time.Second)
+	go func() {
+		for range ticker.C {
+			fetchStateFromS3AndValidateIt()
+		}
+	}()
+
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(*listenFlag, nil))
+}
+
+func fetchStateFromS3AndValidateIt() {
+	fileBytes, err := getFileFromS3("mybucket-gagagagagagag-2020", "path/to/my/key")
+	if err != nil {
+		log.Printf("error getting tf state from s3: %v", err)
+		return
+	}
+
+	_, output, err := runComplianceTool(fileBytes)
+	if err != nil {
+		log.Printf("can't run tool against the state: %v", err)
+		return
+	}
+	fmt.Printf("result: %s", output)
 }
 
 // registerRequest registers in the router an HTTP request with proper error handling and logging.
@@ -154,6 +182,46 @@ func parseComplianceToolOutput(output string, record *ValidationLog) {
 	}
 }
 
+// runComplianceTool runs the tfComplianceBin against the given file content.
+// fileContent may be either a json string, or a terraform binary file format.
+// Returns the input and output of the tool if successful.
+func runComplianceTool(fileContent []byte) (string, string, error) {
+	if len(fileContent) == 0 {
+		return "", "", fmt.Errorf("empty file content")
+	}
+
+	var complianceToolInput []byte
+
+	// in case the content is not already a json (doesn't starts with "{"), may be in
+	// tf bin format (like plan.out or terraform.tfstate). Try to convert it to json.
+	if fileContent[0] != '{' {
+		asJson, err := convertTerraformBinToJson(fileContent)
+		if err != nil {
+			return "", "", fmt.Errorf("cntent given can't be converted to json: %v", err)
+		}
+		complianceToolInput = []byte(asJson)
+	} else {
+		complianceToolInput = fileContent
+	}
+
+	// write the json content to a tmp file
+	jsonTmpPath := os.TempDir() + "/" + "compliance_input.json"
+	if err := ioutil.WriteFile(jsonTmpPath, complianceToolInput, os.ModePerm); err != nil {
+		return "", "", fmt.Errorf("can't create tmp file: %v", err)
+	}
+	defer os.Remove(jsonTmpPath)
+
+	// run the compliance tool against the created file
+	toolOutputBytes, err := exec.Command(tfComplianceBin, "-p", jsonTmpPath, "-f", featuresPath).CombinedOutput()
+	toolOutput := stripansi.Strip(string(toolOutputBytes))
+	if err != nil {
+		log.Printf("Tool output: \n%s\n", toolOutput)
+		return "", "", fmt.Errorf("tool execution error: %v: %s", err, toolOutput)
+	}
+
+	return string(complianceToolInput), toolOutput, nil
+}
+
 // validateReq takes a base64 string in the body with the plan file content
 // or terraform json, run the tfComplianceBin tool against it, and responds
 // the tool output as a response.
@@ -163,40 +231,10 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
-	if len(planFileBytes) == 0 {
-		return "No body given", http.StatusBadRequest, nil
-	}
-
-	// stores the file content given to tfComplianceBin
-	var complianceToolInput []byte
-
-	// in case the content is not already a json (doesn't starts with "{"), may be in
-	// tf bin format (like plan.out or terraform.tfstate). Try to convert it to json.
-	if planFileBytes[0] != '{' {
-		asJson, err := convertTerraformBinToJson(planFileBytes)
-		if err != nil {
-			return fmt.Sprintf("Content given can't be converted to json: %v", err), http.StatusBadRequest, nil
-		}
-		complianceToolInput = []byte(asJson)
-	} else {
-		complianceToolInput = planFileBytes
-	}
-
-	// write the json content to a tmp file
-	jsonTmpPath := os.TempDir() + "/" + "compliance_input.json"
-	err = ioutil.WriteFile(jsonTmpPath, complianceToolInput, os.ModePerm)
+	// run terraform-compliance
+	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes)
 	if err != nil {
-		return "", 0, err
-	}
-	defer os.Remove(jsonTmpPath)
-
-	// run the compliance tool against the created file
-	toolOutputBytes, err := exec.Command(tfComplianceBin, "-p", jsonTmpPath, "-f", featuresPath).CombinedOutput()
-	toolOutput := stripansi.Strip(string(toolOutputBytes))
-	if err != nil {
-		log.Printf("Tool execution failed: %v", err)
-		log.Printf("Tool output: \n%s\n", toolOutput)
-		return "", 0, fmt.Errorf("can't run '%s': %v\noutput: %s\n", tfComplianceBin, err, toolOutput)
+		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}
 
 	// Calculate an ID for the validation
@@ -212,14 +250,14 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 		}
 	}
 
-	// log record
+	// log it
 	record := ValidationLog{
 		Id:        strconv.Itoa(maxId + 1),
 		DateTime:  time.Now().Format(time.ANSIC),
-		InputJson: string(complianceToolInput),
-		Output:    toolOutput,
+		InputJson: complianceInput,
+		Output:    complianceOutput,
 	}
-	parseComplianceToolOutput(toolOutput, &record)
+	parseComplianceToolOutput(complianceOutput, &record)
 	if record.WasSuccessful {
 		log.Printf("Validation result: %d scenarios passed, %d failed and %d skipped.",
 			record.PassedCount,
@@ -227,14 +265,14 @@ func validateReq(body string, _ map[string]string) (string, int, error) {
 			record.SkippedCount)
 	} else {
 		log.Printf("Validation failed. The tool wasn't executed successfully.")
-		log.Printf("Tool output: \n%s", toolOutput)
+		log.Printf("Tool output: \n%s", complianceOutput)
 	}
 
 	if err := db.insertOrUpdateValidationLog(record); err != nil {
 		return "", 0, fmt.Errorf("can't put record in db: %v", err)
 	}
 
-	return toolOutput, http.StatusOK, nil
+	return complianceOutput, http.StatusOK, nil
 }
 
 // featuresReq responds the list of features actually on the database.
@@ -272,6 +310,25 @@ func featureSourceReq(_ string, vars map[string]string) (string, int, error) {
 	}
 
 	return "Feature not found", http.StatusNotFound, nil
+}
+
+func getFileFromS3(bucket, item string) ([]byte, error) {
+	sess, _ := session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1")},
+	)
+	downloader := s3manager.NewDownloader(sess)
+	buf := aws.NewWriteAtBuffer([]byte{})
+	_, err := downloader.Download(buf,
+		&s3.GetObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(item),
+		})
+
+	if err != nil {
+		return nil, fmt.Errorf("can't download item: '%s': %v", item, err)
+	}
+
+	return buf.Bytes(), nil
 }
 
 // featureAddReq adds a new feature in the database, with the source code specified in the body.
