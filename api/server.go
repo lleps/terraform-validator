@@ -49,6 +49,8 @@ func main() {
 	registerRequest(r, "/features/source/{name}", featureSourceReq, "GET")
 	registerRequest(r, "/features/add/{name}", featureAddReq, "POST")
 	registerRequest(r, "/features/remove/{name}", featureRemoveReq, "DELETE")
+	registerRequest(r, "/logs", logsReq, "GET")
+	registerRequest(r, "/logs/{id}", logsGetReq, "GET")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(*listenFlag, nil))
 }
@@ -314,6 +316,59 @@ func featureRemoveReq(_ string, vars map[string]string) (string, int, error) {
 	}
 
 	return "", http.StatusOK, nil
+}
+
+
+// logsReq responds the list of log entries in the database.
+func logsReq(_ string, _ map[string]string) (string, int, error) {
+	logs, err := db.loadAllValidationLogs()
+	if err != nil {
+		return "", 0, err
+	}
+
+	sb := strings.Builder{}
+	for _, l := range logs {
+		if l.WasSuccessful {
+			sb.WriteString(fmt.Sprintf("#%s - %s - successful (%d passed, %d failed, %d skipped)",
+				l.Id, l.DateTime, l.PassedCount, l.FailedCount, l.SkippedCount))
+		} else {
+			sb.WriteString(fmt.Sprintf("#%s - %s - failed. skipped)",
+				l.Id, l.DateTime))
+		}
+		sb.WriteRune('\n')
+	}
+
+	return sb.String(), http.StatusOK, nil
+}
+
+
+// logsGetReq responds the content of the log with the given id.
+func logsGetReq(_ string, vars map[string]string) (string, int, error) {
+	logId := vars["id"]
+	logs, err := db.loadAllValidationLogs()
+	if err != nil {
+		return "", 0, err
+	}
+
+	var logEntry *ValidationLog
+	for _, l := range logs {
+		if l.Id == logId {
+			logEntry = &l
+			break
+		}
+	}
+
+	if logEntry == nil {
+		return "Log entry not found", http.StatusNotFound, nil
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("\n======\nInput:======\n")
+	sb.WriteString(logEntry.InputJson)
+	sb.WriteString("\n======\nOutput:======\n")
+	sb.WriteString(logEntry.Output)
+	sb.WriteRune('\n')
+	return sb.String(), http.StatusOK, nil
 }
 
 // syncFeaturesFolderFromDB writes all the features in the database onto featuresPath.
