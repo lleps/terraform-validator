@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -54,7 +55,8 @@ func main() {
 			return
 		}
 
-		featureName := strings.TrimSuffix(*addFeatureFlag, ".feature")
+		featureFileName := extractNameFromPath(*addFeatureFlag)
+		featureName := strings.TrimSuffix(featureFileName, ".feature")
 		exists, err := checkIfFeatureExists(host, featureName)
 		resErr = err
 		if resErr == nil {
@@ -145,4 +147,31 @@ func execRequest(
 	resContent = string(bodyBytes)
 	resCode = resp.StatusCode
 	return
+}
+
+func reversed(s string) string {
+	chars := []rune(s)
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	return string(chars)
+}
+
+// extractNameFromPath takes the file name from the whole path,
+// for example "path/to/my/file" returns "file", and "myfile" returns "myfile".
+func extractNameFromPath(path string) string {
+	if len(path) == 0 {
+		return ""
+	}
+
+	chars := []rune(path)
+	sb := strings.Builder{}
+	for i := len(chars) - 1; i >= 0; i-- {
+		if chars[i] == os.PathSeparator {
+			break
+		}
+
+		sb.WriteRune(chars[i])
+	}
+	return reversed(sb.String())
 }
