@@ -1,0 +1,9 @@
+Feature: Enable Guard Duty in all regions
+ 
+ 
+        Scenario: aws_guardduty_detector module is expecpeted
+      
+        Given I have resource aws_guardduty_detector  
+ 
+ 
+        Then enable = true
