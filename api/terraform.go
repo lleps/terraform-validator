@@ -46,6 +46,7 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 }
 
 // parseComplianceToolOutput parses compliance tool output into a ValidationLog struct.
+// TODO: remove
 func parseComplianceToolOutput(output string, record *ValidationLog) {
 	record.WasSuccessful = false
 
@@ -75,11 +76,29 @@ func parseComplianceToolOutput(output string, record *ValidationLog) {
 	}
 }
 
+// complianceOutput contains the information extracted from a compliance output.
 type complianceOutput struct {
 	featurePassed map[string]bool // for each feature, true if passed or false otherwise.
 	failMessages map[string][]string // for each failed feature, lists all the error messages.
 }
 
+func (co complianceOutput) ErrorCount() int {
+	result := 0
+	for _, v := range co.featurePassed {
+		if !v {
+			result++
+		}
+	}
+	return result
+}
+
+func (co complianceOutput) TestCount() int {
+	return len(co.featurePassed)
+}
+
+func (co complianceOutput) PassedCount() int {
+	return co.TestCount() - co.ErrorCount()
+}
 
 // extractNameFromPath takes the file name from the whole path,
 // for example "path/to/my/file" returns "file", and "myfile" returns "myfile".

@@ -2,7 +2,8 @@ package main
 
 import (
 	"encoding/base64"
-	"reflect"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -13,28 +14,23 @@ func TestConvertTerraformBinToJson(t *testing.T) {
 	}
 
 	planBytes, err := base64.StdEncoding.DecodeString(planDataB64)
-	if err != nil {
-		t.Fatalf("can't decode plan data: %v", err)
-	}
+	require.Nil(t, err, "cant decode plan data")
 
 	asJson, err := convertTerraformBinToJson(planBytes)
-	if err != nil {
-		t.Fatalf("convertTerraformBinToJson failed: %v", err)
-	}
-
-	if asJson != expectedJson {
-		t.Fatalf("bad result: \n%s\n", asJson)
-	}
+	require.Nil(t, err, "convertTerraformBinToJson failed")
+	assert.Equal(t, expectedJson, asJson, "bad json")
 }
 
 func TestParseComplianceOutput(t *testing.T) {
-	parsed, err := parseComplianceOutput(complianceOut)
-	if err != nil {
-		t.Fatalf("can't parse compliance out: %v", err)
-	}
+	got, err := parseComplianceOutput(complianceOut)
+	require.Nil(t, err, "cant parse out")
 
 	expected := complianceOutput{
-		featurePassed: map[string]bool{"credentials": true, "data.example": true, "other": false},
+		featurePassed: map[string]bool{
+			"credentials": true,
+			"data.example": true,
+			"other": false,
+		},
 		failMessages: map[string][]string{
 			"credentials": {},
 			"data.example": {},
@@ -47,16 +43,12 @@ func TestParseComplianceOutput(t *testing.T) {
 			},
 		},
 	}
-
-	if !reflect.DeepEqual(expected.featurePassed, parsed.featurePassed) {
-		t.Errorf("featurePassed not equals. \nexpects: '%v'. \nbut got: '%v'.", expected.featurePassed, parsed.featurePassed)
-	}
-
-	if !reflect.DeepEqual(expected.failMessages, parsed.failMessages) {
-		t.Errorf("failMessages not equals. \nexpects: '%v'. \nbut got: '%v'.", expected.failMessages, parsed.failMessages)
-	}
+	assert.Equal(t, expected.featurePassed, got.featurePassed, "bad featurePassed")
+	assert.Equal(t, expected.failMessages, got.failMessages, "bad failMessages")
+	assert.Equal(t, 1, got.ErrorCount(), "bad ErrorCount")
+	assert.Equal(t, 2, got.PassedCount(), "bad PassedCount")
+	assert.Equal(t, 3, got.TestCount(), "bad TestCount")
 }
-
 
 var complianceOut = `
 terraform-compliance v1.0.37 initiated
