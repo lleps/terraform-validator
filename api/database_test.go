@@ -1,7 +1,8 @@
 package main
 
 import (
-	"log"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -21,66 +22,33 @@ func TestDynamoDB(t *testing.T) {
 	}
 
 	// 1. Insertion
-	features := []*ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
+	expected := []*ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
 	ddb := newDynamoDB("terraformvalidator_test")
-	if err := ddb.initTables(); err != nil {
-		t.Fatalf("ensureTableExists: %v", err)
-	}
-
-	for _, f := range features {
-		if err := ddb.insertOrUpdateFeature(f); err != nil {
-			t.Fatalf("inserting: %v", err)
-		}
+	require.Nil(t, ddb.initTables(), "1: insertion: ensureTableExists")
+	for _, f := range expected {
+		require.Nil(t, ddb.insertOrUpdateFeature(f), "1: insertion: insertOrUpdateFeature")
 	}
 
 	// 2. Loading
-	loadedFeatures, err := ddb.loadAllFeatures()
-	if err != nil {
-		log.Fatalf("loading: %v", err)
-	}
-	assertFeaturesMatch(features, loadedFeatures, "loading", t)
+	got, err := ddb.loadAllFeatures()
+	require.Nil(t, err, "2: loading")
+	assert.Equal(t, expected, got, "2: loading")
 
 	// 3. Removing
-	if err := ddb.removeFeature("abc"); err != nil {
-		t.Fatalf("removing: %v", err)
-	}
-	features = features[1:]
+	require.Nil(t, ddb.removeFeature("abc"), "3: removing")
+	expected = expected[1:]
 
 	// 4. Removing check
-	loadedFeatures, err = ddb.loadAllFeatures()
-	if err != nil {
-		log.Fatalf("removing check: %v", err)
-	}
-	assertFeaturesMatch(features, loadedFeatures, "removing check", t)
+	got, err = ddb.loadAllFeatures()
+	require.Nil(t, err, "4: removing check")
+	assert.Equal(t, expected, got, "4: removing check")
 
 	// 5. Updating
-	features[0] = &ComplianceFeature{"jjj", "999"}
-	if err := ddb.insertOrUpdateFeature(features[0]); err != nil {
-		log.Fatalf("update: %v", err)
-	}
+	expected[0] = &ComplianceFeature{"jjj", "999"}
+	require.Nil(t, ddb.insertOrUpdateFeature(expected[0]), "4: removing check")
 
 	// 6. Updating check
-	loadedFeatures, err = ddb.loadAllFeatures()
-	if err != nil {
-		log.Fatalf("update check: %v", err)
-	}
-	assertFeaturesMatch(features, loadedFeatures, "update check", t)
-}
-
-func assertFeaturesMatch(expected []*ComplianceFeature, actual []*ComplianceFeature, msg string, t *testing.T) {
-	if len(expected) != len(actual) {
-		t.Fatalf("%s: \nlen(expected): %d != len(actual): %d.\n"+
-			"expected: %v\n"+
-			"actual: %v",
-			msg,
-			len(expected), len(actual),
-			expected,
-			actual)
-	}
-
-	for i, f := range expected {
-		if *f != *actual[i] {
-			t.Errorf("%s:\nFeature mismatch at idx %d. Expected: %v. Actual: %v", msg, i, f, actual[i])
-		}
-	}
+	got, err = ddb.loadAllFeatures()
+	require.Nil(t, err, "5: updating check")
+	assert.Equal(t, expected, got, "5: updating check")
 }

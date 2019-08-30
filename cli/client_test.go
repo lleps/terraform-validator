@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func TestExtractNameFromPath(t *testing.T) {
 	cases := map[string]string {
@@ -8,9 +11,6 @@ func TestExtractNameFromPath(t *testing.T) {
 		"myfile": "myfile",
 	}
 	for input, expected := range cases {
-		got := extractNameFromPath(input)
-		if got != expected {
-			t.Errorf("TestExtractNameFromPath for '%s': expected: '%s', got: '%s", input, expected, got)
-		}
+		assert.Equal(t, expected, extractNameFromPath(input), "for input: " + input)
 	}
 }
