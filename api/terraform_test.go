@@ -21,6 +21,20 @@ func TestConvertTerraformBinToJson(t *testing.T) {
 	assert.Equal(t, expectedJson, asJson, "bad json")
 }
 
+// this one is duplicated in client_test.go. However, its
+// cheaper to repeat this block of code than doing a common
+// library. Its unlikely that in the future more functionality
+// is going to be shared.
+func TestExtractNameFromPath(t *testing.T) {
+	cases := map[string]string {
+		"/path/to/my/file": "file",
+		"myfile": "myfile",
+	}
+	for input, expected := range cases {
+		assert.Equal(t, expected, extractNameFromPath(input), "for input: " + input)
+	}
+}
+
 func TestParseComplianceOutput(t *testing.T) {
 	got, err := parseComplianceOutput(complianceOut)
 	require.Nil(t, err, "cant parse out")
