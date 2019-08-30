@@ -1,10 +1,11 @@
 // This file provides an easy-to-use interface to store and
-// retrieve some defined items from a dynamoDB database, without
+// retrieve some defined items from a database, without
 // having to worry about dynamo-specific code.
 
 package main
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -24,6 +25,18 @@ type ComplianceFeature struct {
 	FeatureSource string // gherkin source code of the feature
 }
 
+func (f *ComplianceFeature) id() string {
+	return f.Id
+}
+
+func (f *ComplianceFeature) topLevel() string {
+	return f.Id
+}
+
+func (f *ComplianceFeature) details() string {
+	return f.FeatureSource
+}
+
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
 	Id            string // number of the log entry
@@ -34,6 +47,20 @@ type ValidationLog struct {
 	FailedCount   int    // the number of scenarios failed (if WasSuccessful)
 	SkippedCount  int    // the number of scenarios skipped (if WasSuccessful)
 	PassedCount   int    // the number of scenarios passed (if WasSuccessful)
+}
+
+func (l *ValidationLog) id() string {
+	return l.Id
+}
+
+func (l *ValidationLog) topLevel() string {
+	return fmt.Sprintf("#%s [%s] :: %d errors, %d skipped, %d passed.",
+		l.Id, l.DateTime, l.FailedCount, l.SkippedCount, l.PassedCount,
+	)
+}
+
+func (l *ValidationLog) details() string {
+	return "details"
 }
 
 // defines table names for each type
@@ -48,30 +75,30 @@ var (
 	validationLogAttributes     = []string{"DateTime", "InputJson", "Output", "WasSuccessful", "FailedCount", "SkippedCount", "PassedCount"}
 )
 
-type dynamoDB struct {
+type database struct {
 	svc         *dynamodb.DynamoDB
 	tablePrefix string
 }
 
 // newDynamoDB creates a DynamoDB instance using the default aws authentication method.
-func newDynamoDB(tablePrefix string) dynamoDB {
+func newDynamoDB(tablePrefix string) *database {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	return dynamoDB{dynamodb.New(sess), tablePrefix}
+	return &database{dynamodb.New(sess), tablePrefix}
 }
 
 // Generic table methods. Those should not be used outside this file.
 // Instead, type-specific methods (defined below) should be used.
 
-// tableFor returns the full dynamoDB table ({prefix}_{name}).
-func (ddb dynamoDB) tableFor(name string) string {
-	return ddb.tablePrefix + "_" + name
+// tableFor returns the full database table ({prefix}_{name}).
+func (db *database) tableFor(name string) string {
+	return db.tablePrefix + "_" + name
 }
 
-// initTable creates tableName on the given dynamoDB session if it does not exists.
-func (ddb dynamoDB) initTable(tableName string) error {
+// initTable creates tableName on the given database session if it does not exists.
+func (db *database) initTable(tableName string) error {
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
@@ -92,7 +119,7 @@ func (ddb dynamoDB) initTable(tableName string) error {
 		TableName: aws.String(tableName),
 	}
 
-	_, err := ddb.svc.CreateTable(input)
+	_, err := db.svc.CreateTable(input)
 	if err != nil {
 		errAws := err.(awserr.Error)
 		if strings.Contains(errAws.Message(), "Table already exists") {
@@ -112,7 +139,7 @@ func (ddb dynamoDB) initTable(tableName string) error {
 }
 
 // insertOrUpdateGeneric inserts or updates the given item on the table.
-func (ddb dynamoDB) insertOrUpdateGeneric(tableName string, item interface{}) error {
+func (db *database) insertOrUpdateGeneric(tableName string, item interface{}) error {
 	av, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
 		return err
@@ -122,7 +149,7 @@ func (ddb dynamoDB) insertOrUpdateGeneric(tableName string, item interface{}) er
 		Item:      av,
 		TableName: aws.String(tableName),
 	}
-	_, err = ddb.svc.PutItem(input)
+	_, err = db.svc.PutItem(input)
 	if err != nil {
 		return err
 	}
@@ -131,7 +158,7 @@ func (ddb dynamoDB) insertOrUpdateGeneric(tableName string, item interface{}) er
 }
 
 // loadAllGeneric provides a generic way to load all items from a table.
-func (ddb dynamoDB) loadAllGeneric(
+func (db *database) loadAllGeneric(
 	tableName string,
 	attributes []string, // list of the item attribute names (apart from "Id")
 	onItemLoaded func(map[string]*dynamodb.AttributeValue) error, // called for each loaded item
@@ -154,7 +181,7 @@ func (ddb dynamoDB) loadAllGeneric(
 		TableName:                 aws.String(tableName),
 	}
 
-	result, err := ddb.svc.Scan(params)
+	result, err := db.svc.Scan(params)
 	if err != nil {
 		return err
 	}
@@ -168,7 +195,7 @@ func (ddb dynamoDB) loadAllGeneric(
 }
 
 // removeGeneric removes all the items in the given table whose Id equals id.
-func (ddb dynamoDB) removeGeneric(tableName string, id string) error {
+func (db *database) removeGeneric(tableName string, id string) error {
 	input := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"Id": {
@@ -178,7 +205,7 @@ func (ddb dynamoDB) removeGeneric(tableName string, id string) error {
 		TableName: aws.String(tableName),
 	}
 
-	_, err := ddb.svc.DeleteItem(input)
+	_, err := db.svc.DeleteItem(input)
 	if err != nil {
 		return err
 	}
@@ -189,37 +216,37 @@ func (ddb dynamoDB) removeGeneric(tableName string, id string) error {
 // Type-Specific method definitions.
 
 // initTables will ensure all the necessary DynamoDB tables exists.
-func (ddb dynamoDB) initTables() error {
-	if err := ddb.initTable(ddb.tableFor(complianceFeatureTable)); err != nil {
+func (db *database) initTables() error {
+	if err := db.initTable(db.tableFor(complianceFeatureTable)); err != nil {
 		return err
 	}
-	if err := ddb.initTable(ddb.tableFor(validationLogTable)); err != nil {
+	if err := db.initTable(db.tableFor(validationLogTable)); err != nil {
 		return err
 	}
 	return nil
 }
 
 // insertOrUpdateFeature inserts or updates the given feature on the database.
-func (ddb dynamoDB) insertOrUpdateFeature(feature ComplianceFeature) error {
-	return ddb.insertOrUpdateGeneric(ddb.tableFor(complianceFeatureTable), feature)
+func (db *database) insertOrUpdateFeature(feature ComplianceFeature) error {
+	return db.insertOrUpdateGeneric(db.tableFor(complianceFeatureTable), feature)
 }
 
 // insertOrUpdateValidationLog inserts or updates the given validation log on the database.
-func (ddb dynamoDB) insertOrUpdateValidationLog(validationLog ValidationLog) error {
-	return ddb.insertOrUpdateGeneric(ddb.tableFor(validationLogTable), validationLog)
+func (db *database) insertOrUpdateValidationLog(validationLog ValidationLog) error {
+	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), validationLog)
 }
 
 // loadAllFeatures returns all the ComplianceFeature items on the database.
-func (ddb dynamoDB) loadAllFeatures() ([]ComplianceFeature, error) {
-	var features []ComplianceFeature
-	err := ddb.loadAllGeneric(
-		ddb.tableFor(complianceFeatureTable),
+func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
+	var features []*ComplianceFeature
+	err := db.loadAllGeneric(
+		db.tableFor(complianceFeatureTable),
 		complianceFeatureAttributes,
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ComplianceFeature
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
 			if err == nil {
-				features = append(features, elem)
+				features = append(features, &elem)
 			}
 			return err
 		})
@@ -228,16 +255,16 @@ func (ddb dynamoDB) loadAllFeatures() ([]ComplianceFeature, error) {
 }
 
 // loadAllValidationLogs returns all the ValidationLog items on the database.
-func (ddb dynamoDB) loadAllValidationLogs() ([]ValidationLog, error) {
-	var validationLogs []ValidationLog
-	err := ddb.loadAllGeneric(
-		ddb.tableFor(validationLogTable),
+func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
+	var validationLogs []*ValidationLog
+	err := db.loadAllGeneric(
+		db.tableFor(validationLogTable),
 		validationLogAttributes,
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ValidationLog
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
 			if err == nil {
-				validationLogs = append(validationLogs, elem)
+				validationLogs = append(validationLogs, &elem)
 			}
 			return err
 		})
@@ -246,11 +273,11 @@ func (ddb dynamoDB) loadAllValidationLogs() ([]ValidationLog, error) {
 }
 
 // removeFeature removes the first feature whose Id is id.
-func (ddb dynamoDB) removeFeature(id string) error {
-	return ddb.removeGeneric(ddb.tableFor(complianceFeatureTable), id)
+func (db *database) removeFeature(id string) error {
+	return db.removeGeneric(db.tableFor(complianceFeatureTable), id)
 }
 
 // removeValidationLog removes the first validation log whose Id is id.
-func (ddb dynamoDB) removeValidationLog(id string) error {
-	return ddb.removeGeneric(ddb.tableFor(validationLogTable), id)
+func (db *database) removeValidationLog(id string) error {
+	return db.removeGeneric(db.tableFor(validationLogTable), id)
 }

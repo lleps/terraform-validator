@@ -14,13 +14,15 @@ import (
 func main() {
 	// cmd flags
 	hostFlag := flag.String("host", "http://localhost:8080", "The host to connect to")
+	// features
 	validateFlag := flag.String("validate", "", "Validate the given terraform plan file.")
-	listFeaturesFlag := flag.Bool("list", false, "List all features")
-	listLogsFlag := flag.Bool("logs", false, "List all logs")
-	logGetFlag := flag.String("log", "", "Get the info of the given log")
-	addFeatureFlag := flag.String("add", "", "Add a new feature from the given file. The name will be the file name.")
-	featureSourceFlag := flag.String("read", "", "Get the source code of the given feature.")
-	removeFeatureFlag := flag.String("remove", "", "Remove the feature with the given name")
+	listFeaturesFlag := flag.Bool("feature-list", false, "List all features")
+	addFeatureFlag := flag.String("feature-add", "", "Add a new feature from the given file. The name will be the file name.")
+	removeFeatureFlag := flag.String("remove-remove", "", "Remove the feature with the given name")
+	featureSourceFlag := flag.String("feature-details", "", "Get the source code of the given feature.")
+	// logs
+	listLogsFlag := flag.Bool("log-list", false, "List all logs")
+	logGetFlag := flag.String("log-details", "", "Get the info of the given log")
 	replaceFlag := flag.Bool("replace", false, "For -add, to replace the feature if it already exists.")
 
 	flag.Parse()
@@ -42,7 +44,7 @@ func main() {
 	} else if *listFeaturesFlag { // --list-features
 		resContent, resCode, resErr = execRequest(host, "/features", "GET", "")
 	} else if *featureSourceFlag != "" { // --list-features
-		resContent, resCode, resErr = execRequest(host, "/features/source/"+*featureSourceFlag, "GET", "")
+		resContent, resCode, resErr = execRequest(host, "/features/"+*featureSourceFlag, "GET", "")
 	} else if *addFeatureFlag != "" { // --add-feature
 		content, err := ioutil.ReadFile(*addFeatureFlag)
 		if err != nil {
@@ -64,11 +66,11 @@ func main() {
 				fmt.Printf("Feature '%s' already exists. Pass --replace to overwrite it.\n", featureName)
 				return
 			}
-			resContent, resCode, resErr = execRequest(host, "/features/add/"+featureName, "POST", string(content))
+			resContent, resCode, resErr = execRequest(host, "/features/"+featureName, "POST", string(content))
 		}
 	} else if *removeFeatureFlag != "" { // --remove-feature
 		fileWithoutExt := strings.TrimSuffix(*removeFeatureFlag, ".feature")
-		resContent, resCode, resErr = execRequest(host, "/features/remove/"+fileWithoutExt, "DELETE", "")
+		resContent, resCode, resErr = execRequest(host, "/features/"+fileWithoutExt, "DELETE", "")
 	} else if *listLogsFlag { // --logs
 		resContent, resCode, resErr = execRequest(host, "/logs", "GET", "")
 	} else if *logGetFlag != "" { // --log
