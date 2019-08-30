@@ -45,6 +45,37 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	return string(prettyJSON.Bytes()), nil
 }
 
+// diffBetweenTFStates returns the list of added and removed lines in the newJson, relative to oldJson.
+func diffBetweenTFStates(oldJson, newJson string) (added []string, removed []string) {
+	sliceContains := func(element string, slice []string) bool {
+		for _, e := range slice {
+			if e == element {
+				return true
+			}
+		}
+		return false
+	}
+	oldLines := strings.Split(oldJson, "\n")
+	newLines := strings.Split(newJson, "\n")
+
+	// lines in new, but not in old
+	added = make([]string, 0)
+	for _, line := range newLines {
+		if !sliceContains(line, oldLines) {
+			added = append(added, line)
+		}
+	}
+
+	// lines in old, but not in new
+	removed = make([]string, 0)
+	for _, line := range oldLines {
+		if !sliceContains(line, newLines) {
+			removed = append(removed, line)
+		}
+	}
+	return
+}
+
 // complianceOutput contains the information extracted from a compliance output.
 type complianceOutput struct {
 	featurePassed map[string]bool // for each feature, true if passed or false otherwise.

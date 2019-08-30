@@ -21,6 +21,20 @@ func TestConvertTerraformBinToJson(t *testing.T) {
 	assert.Equal(t, expectedJson, asJson, "bad json")
 }
 
+func TestDiffBetweenTFStates(t *testing.T) {
+	oldStr := `
+	hey
+	milan`
+	newStr := `
+	hey
+	joe`
+	addedExpected := []string{ "\tjoe" }
+	removedExpected := []string { "\tmilan" }
+	addedGot, removedGot := diffBetweenTFStates(oldStr, newStr)
+	assert.Equal(t, addedExpected, addedGot, "added")
+	assert.Equal(t, removedExpected, removedGot, "removed")
+}
+
 // this one is duplicated in client_test.go. However, its
 // cheaper to repeat this block of code than doing a common
 // library. Its unlikely that in the future more functionality
