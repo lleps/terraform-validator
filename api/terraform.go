@@ -45,37 +45,6 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	return string(prettyJSON.Bytes()), nil
 }
 
-// parseComplianceToolOutput parses compliance tool output into a ValidationLog struct.
-// TODO: remove
-func parseComplianceToolOutput(output string, record *ValidationLog) {
-	record.WasSuccessful = false
-
-	for _, line := range strings.Split(output, "\n") {
-		featureCount, passedCount, failedCount, skippedCount := 0, 0, 0, 0
-
-		// "X features (X passed, X failed, X skipped)"
-		count, err := fmt.Sscanf(line,
-			"%d features (%d passed, %d failed, %d skipped)",
-			&featureCount, &passedCount, &failedCount, &skippedCount)
-
-		if err != nil { // above failed, maybe "X features (X passed, X skipped)"?
-			count, err = fmt.Sscanf(line,
-				"%d features (%d passed, %d skipped)",
-				&featureCount, &passedCount, &skippedCount)
-			failedCount = 0
-		}
-
-		// if any of them match, parse into record and break the loop
-		if err == nil && count >= 3 {
-			record.WasSuccessful = true
-			record.FailedCount = failedCount
-			record.PassedCount = passedCount
-			record.SkippedCount = skippedCount
-			break
-		}
-	}
-}
-
 // complianceOutput contains the information extracted from a compliance output.
 type complianceOutput struct {
 	featurePassed map[string]bool // for each feature, true if passed or false otherwise.

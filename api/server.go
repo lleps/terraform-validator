@@ -164,16 +164,6 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		InputJson: complianceInput,
 		Output:    complianceOutput,
 	}
-	parseComplianceToolOutput(complianceOutput, &record)
-	if record.WasSuccessful {
-		log.Printf("Validation result: %d scenarios passed, %d failed and %d skipped.",
-			record.PassedCount,
-			record.FailedCount,
-			record.SkippedCount)
-	} else {
-		log.Printf("Validation failed. The tool wasn't executed successfully.")
-		log.Printf("Tool output: \n%s", complianceOutput)
-	}
 
 	if err := db.insertOrUpdateValidationLog(&record); err != nil {
 		return "", 0, fmt.Errorf("can't put record in db: %v", err)

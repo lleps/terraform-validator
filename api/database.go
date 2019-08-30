@@ -43,10 +43,6 @@ type ValidationLog struct {
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
 	Output        string // the compliance tool raw output
-	WasSuccessful bool   // if the compliance tool executed properly
-	FailedCount   int    // the number of scenarios failed (if WasSuccessful)
-	SkippedCount  int    // the number of scenarios skipped (if WasSuccessful)
-	PassedCount   int    // the number of scenarios passed (if WasSuccessful)
 }
 
 func (l *ValidationLog) id() string {
@@ -54,9 +50,7 @@ func (l *ValidationLog) id() string {
 }
 
 func (l *ValidationLog) topLevel() string {
-	return fmt.Sprintf("#%s [%s] :: %d errors, %d skipped, %d passed.",
-		l.Id, l.DateTime, l.FailedCount, l.SkippedCount, l.PassedCount,
-	)
+	return fmt.Sprintf("#%s [%s]", l.Id, l.DateTime)
 }
 
 func (l *ValidationLog) details() string {
@@ -72,7 +66,7 @@ const (
 // defines the attributes for each type, used to build projections in dynamo.
 var (
 	complianceFeatureAttributes = []string{"FeatureSource"}
-	validationLogAttributes     = []string{"DateTime", "InputJson", "Output", "WasSuccessful", "FailedCount", "SkippedCount", "PassedCount"}
+	validationLogAttributes     = []string{"DateTime", "InputJson", "Output"}
 )
 
 type database struct {
