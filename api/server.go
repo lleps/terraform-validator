@@ -88,7 +88,7 @@ func initEndpoints() {
 			}
 
 			defer func() { _ = syncFeaturesFolderFromDB() }()
-			return db.insertOrUpdateFeature(ComplianceFeature{featureName, body})
+			return db.insertOrUpdateFeature(&ComplianceFeature{featureName, body})
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
@@ -175,7 +175,7 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		log.Printf("Tool output: \n%s", complianceOutput)
 	}
 
-	if err := db.insertOrUpdateValidationLog(record); err != nil {
+	if err := db.insertOrUpdateValidationLog(&record); err != nil {
 		return "", 0, fmt.Errorf("can't put record in db: %v", err)
 	}
 

@@ -21,7 +21,7 @@ func TestDynamoDB(t *testing.T) {
 	}
 
 	// 1. Insertion
-	features := []ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
+	features := []*ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
 	ddb := newDynamoDB("terraformvalidator_test")
 	if err := ddb.initTables(); err != nil {
 		t.Fatalf("ensureTableExists: %v", err)
@@ -54,7 +54,7 @@ func TestDynamoDB(t *testing.T) {
 	assertFeaturesMatch(features, loadedFeatures, "removing check", t)
 
 	// 5. Updating
-	features[0] = ComplianceFeature{"jjj", "999"}
+	features[0] = &ComplianceFeature{"jjj", "999"}
 	if err := ddb.insertOrUpdateFeature(features[0]); err != nil {
 		log.Fatalf("update: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestDynamoDB(t *testing.T) {
 	assertFeaturesMatch(features, loadedFeatures, "update check", t)
 }
 
-func assertFeaturesMatch(expected []ComplianceFeature, actual []ComplianceFeature, msg string, t *testing.T) {
+func assertFeaturesMatch(expected []*ComplianceFeature, actual []*ComplianceFeature, msg string, t *testing.T) {
 	if len(expected) != len(actual) {
 		t.Fatalf("%s: \nlen(expected): %d != len(actual): %d.\n"+
 			"expected: %v\n"+
@@ -79,7 +79,7 @@ func assertFeaturesMatch(expected []ComplianceFeature, actual []ComplianceFeatur
 	}
 
 	for i, f := range expected {
-		if f != actual[i] {
+		if *f != *actual[i] {
 			t.Errorf("%s:\nFeature mismatch at idx %d. Expected: %v. Actual: %v", msg, i, f, actual[i])
 		}
 	}

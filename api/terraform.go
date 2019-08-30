@@ -45,7 +45,6 @@ func convertTerraformBinToJson(fileBytes []byte) (string, error) {
 	return string(prettyJSON.Bytes()), nil
 }
 
-
 // parseComplianceToolOutput parses compliance tool output into a ValidationLog struct.
 func parseComplianceToolOutput(output string, record *ValidationLog) {
 	record.WasSuccessful = false
@@ -74,6 +73,77 @@ func parseComplianceToolOutput(output string, record *ValidationLog) {
 			break
 		}
 	}
+}
+
+type complianceOutput struct {
+	featurePassed map[string]bool // for each feature, true if passed or false otherwise.
+	failMessages map[string][]string // for each failed feature, lists all the error messages.
+}
+
+
+// extractNameFromPath takes the file name from the whole path,
+// for example "path/to/my/file" returns "file", and "myfile" returns "myfile".
+func extractNameFromPath(path string) string {
+	if len(path) == 0 {
+		return ""
+	}
+
+	reversed := func(s string) string {
+		chars := []rune(s)
+		for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+			chars[i], chars[j] = chars[j], chars[i]
+		}
+		return string(chars)
+	}
+
+	chars := []rune(path)
+	sb := strings.Builder{}
+	for i := len(chars) - 1; i >= 0; i-- {
+		if chars[i] == os.PathSeparator {
+			break
+		}
+
+		sb.WriteRune(chars[i])
+	}
+	return reversed(sb.String())
+}
+
+// parseComplianceOutput takes an output of the tool and extracts the useful
+// information (ie which features passed and which failed) in a structured way.
+func parseComplianceOutput(output string) (complianceOutput, error) {
+	currentFeature := "" // current iterating feature
+
+	result := complianceOutput{}
+	result.featurePassed = make(map[string]bool)
+	result.failMessages = make(map[string][]string)
+
+	lines := strings.Split(output, "\n")
+	for _, l := range lines {
+		if strings.HasPrefix(l, "Feature:") {
+			fields := strings.Split(l, "#")
+			if len(fields) != 2 {
+				return complianceOutput{}, fmt.Errorf("can't parse line: '%s': len of fields must be 2, is %d", l, len(fields))
+			}
+
+			currentFeature = strings.TrimSpace(fields[1])
+			currentFeature = extractNameFromPath(currentFeature)
+			currentFeature = strings.TrimSuffix(currentFeature, ".feature")
+			result.featurePassed[currentFeature] = true // true. Later may encounter a failure and set to false
+			result.failMessages[currentFeature] = make([]string, 0)
+		} else {
+			if currentFeature != "" {
+				trimmed := strings.TrimSpace(l)
+				if strings.HasPrefix(trimmed, "Failure:") && len(strings.Split(trimmed, ":")) == 2 {
+					errorMessage := strings.TrimSpace(strings.Split(trimmed, ":")[1])
+
+					result.featurePassed[currentFeature] = false
+					result.failMessages[currentFeature] = append(result.failMessages[currentFeature], errorMessage)
+				}
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // runComplianceTool runs the tfComplianceBin against the given file content.

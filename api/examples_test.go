@@ -11,6 +11,4 @@ func ExampleGetObjectFromS3() {
 		log.Fatalf("error: %v", err)
 	}
 	fmt.Println("object: ", string(bytes))
-	// Output:
-	// asd
 }

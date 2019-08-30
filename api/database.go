@@ -227,12 +227,12 @@ func (db *database) initTables() error {
 }
 
 // insertOrUpdateFeature inserts or updates the given feature on the database.
-func (db *database) insertOrUpdateFeature(feature ComplianceFeature) error {
+func (db *database) insertOrUpdateFeature(feature *ComplianceFeature) error {
 	return db.insertOrUpdateGeneric(db.tableFor(complianceFeatureTable), feature)
 }
 
 // insertOrUpdateValidationLog inserts or updates the given validation log on the database.
-func (db *database) insertOrUpdateValidationLog(validationLog ValidationLog) error {
+func (db *database) insertOrUpdateValidationLog(validationLog *ValidationLog) error {
 	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), validationLog)
 }
 
