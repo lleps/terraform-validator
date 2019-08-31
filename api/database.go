@@ -50,11 +50,50 @@ func (l *ValidationLog) id() string {
 }
 
 func (l *ValidationLog) topLevel() string {
-	return fmt.Sprintf("#%s [%s]", l.Id, l.DateTime)
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%s | #%s ", l.DateTime, l.Id))
+	parsed, err := parseComplianceOutput(l.Output)
+	if err != nil {
+		return sb.String() + "<can't parse output>"
+	}
+	if parsed.ErrorCount() > 0 {
+		sb.WriteString(fmt.Sprintf("FAILED [%d of %d tests failed]", parsed.ErrorCount(), parsed.TestCount()))
+	} else {
+		sb.WriteString(fmt.Sprintf("PASSING [%d tests passed]", parsed.TestCount()))
+	}
+	return sb.String()
 }
 
 func (l *ValidationLog) details() string {
-	return "details"
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", "manual validaton", l.DateTime))
+	sb.WriteString("\n")
+	sb.WriteString("Features:\n")
+	parsed, err := parseComplianceOutput(l.Output)
+	if err != nil {
+		return sb.String() + "<can't parse output: " + err.Error() + ">"
+	}
+
+	for feature, passing := range parsed.featurePassed {
+		if !passing {
+			sb.WriteString(fmt.Sprintf(" - %s FAILED: %s", feature, parsed.failMessages[feature][0]))
+		} else {
+			sb.WriteString(fmt.Sprintf(" - %s OK (skipped or passed)", feature))
+		}
+		sb.WriteRune('\n')
+	}
+	sb.WriteRune('\n')
+
+	if parsed.ErrorCount() > 0 {
+		sb.WriteString("Errors:\n")
+		for k, errors := range parsed.failMessages {
+			for _, e := range errors {
+				sb.WriteString(fmt.Sprintf(" - %s: %s\n", k, e))
+			}
+		}
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }
 
 // defines table names for each type

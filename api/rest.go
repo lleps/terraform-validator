@@ -76,7 +76,38 @@ type collectionEndpointBuilder struct {
 // methods for the given endpoint, without having to duplicate logic
 // for every persistent object in the database.
 func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder) {
-	// GET /endpoint
+	// GET /endpoint and GET /endpoint/{id}
+	if builder.dbFetcher != nil {
+		allHandler := func(body string, _ map[string]string) (string, int, error) {
+			objs, err := builder.dbFetcher(db)
+			if err != nil {
+				return "db error", 0, fmt.Errorf("GET: can't fetch object: %v", err)
+			}
+			sb := strings.Builder{}
+			for _, o := range objs {
+				sb.WriteString(o.topLevel())
+				sb.WriteRune('\n')
+			}
+			return sb.String(), http.StatusOK, nil
+		}
+		detailsHandler := func(body string, urlVars map[string]string) (string, int, error) {
+			id := urlVars["id"]
+			objs, err := builder.dbFetcher(db)
+			if err != nil {
+				return "db error", 0, fmt.Errorf("GET: can't fetch object: %v", err)
+			}
+			for _, elem := range objs {
+				if elem.id() == id {
+					return elem.details(), http.StatusOK, nil
+				}
+			}
+			return "", http.StatusNotFound, nil
+		}
+		registerEndpoint(builder.router, builder.endpoint, allHandler, "GET")
+		registerEndpoint(builder.router, builder.endpoint + "/{id}", detailsHandler, "GET")
+	}
+
+	// GET /endpoint/{id}
 	if builder.dbFetcher != nil {
 		handler := func(body string, _ map[string]string) (string, int, error) {
 			objs, err := builder.dbFetcher(db)

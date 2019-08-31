@@ -160,7 +160,7 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 	// log it
 	record := ValidationLog{
 		Id:        strconv.Itoa(maxId + 1),
-		DateTime:  time.Now().Format(time.ANSIC),
+		DateTime:  time.Now().Format(time.Stamp),
 		InputJson: complianceInput,
 		Output:    complianceOutput,
 	}

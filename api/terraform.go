@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/acarl005/stripansi"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -198,8 +197,11 @@ func runComplianceTool(fileContent []byte) (string, string, error) {
 	toolOutputBytes, err := exec.Command(tfComplianceBin, "-p", jsonTmpPath, "-f", featuresPath).CombinedOutput()
 	toolOutput := stripansi.Strip(string(toolOutputBytes))
 	if err != nil {
-		log.Printf("Tool output: \n%s\n", toolOutput)
-		return "", "", fmt.Errorf("tool execution error: %v: %s", err, toolOutput)
+		_, isExitError := err.(*exec.ExitError)
+		// ignore exit code errors, compliance throws them all the time.
+		if !isExitError {
+			return "", "", fmt.Errorf("tool execution error: %v", err)
+		}
 	}
 
 	return string(complianceToolInput), toolOutput, nil
