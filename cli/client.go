@@ -16,23 +16,29 @@ func main() {
 	hostFlag := flag.String("host", "http://localhost:8080", "The host to connect to")
 	// features
 	validateFlag := flag.String("validate", "", "Validate the given terraform plan file.")
-	listFeaturesFlag := flag.Bool("feature-list", false, "List all features")
-	addFeatureFlag := flag.String("feature-add", "", "Add a new feature from the given file. The name will be the file name.")
-	removeFeatureFlag := flag.String("remove-remove", "", "Remove the feature with the given name")
-	featureSourceFlag := flag.String("feature-details", "", "Get the source code of the given feature.")
+	featureListFlag := flag.Bool("feature-list", false, "List all features")
+	featureAddFlag := flag.String("feature-add", "", "Add a new feature from the given file. The name will be the file name.")
+	featureRemoveFlag := flag.String("remove-remove", "", "Remove the feature with the given name")
+	featureDetailsFlag := flag.String("feature-details", "", "Get the source code of the given feature.")
+	featureReplaceFlag := flag.Bool("replace", false, "For -add, to replace the feature if it already exists.")
 	// logs
-	listLogsFlag := flag.Bool("log-list", false, "List all logs")
+	logListFlag := flag.Bool("log-list", false, "List all logs")
 	logGetFlag := flag.String("log-details", "", "Get the info of the given log")
-	replaceFlag := flag.Bool("replace", false, "For -add, to replace the feature if it already exists.")
+	logRemoveFlag := flag.String("log-remove", "", "Remove the log entry with the given id")
 
 	flag.Parse()
+
 	host := *hostFlag
 
-	// send request depending on the flags
-	var resContent string
-	var resCode int
+	var res string
+	var code int
 	var resErr error
-	if *validateFlag != "" { // --validate
+
+	switch {
+
+	// validation
+
+	case *validateFlag != "":
 		content, err := ioutil.ReadFile(*validateFlag)
 		if err != nil {
 			log.Fatal("Can't read file:", err)
@@ -40,59 +46,71 @@ func main() {
 		}
 
 		asB64 := base64.StdEncoding.EncodeToString(content)
-		resContent, resCode, resErr = execRequest(host, "/validate", "POST", asB64)
-	} else if *listFeaturesFlag { // --list-features
-		resContent, resCode, resErr = execRequest(host, "/features", "GET", "")
-	} else if *featureSourceFlag != "" { // --list-features
-		resContent, resCode, resErr = execRequest(host, "/features/"+*featureSourceFlag, "GET", "")
-	} else if *addFeatureFlag != "" { // --add-feature
-		content, err := ioutil.ReadFile(*addFeatureFlag)
+		res, code, resErr = execRequest(host, "/validate", "POST", asB64)
+
+	// -feature-*
+
+	case *featureListFlag:
+		res, code, resErr = execRequest(host, "/features", "GET", "")
+	case *featureAddFlag != "":
+		content, err := ioutil.ReadFile(*featureAddFlag)
 		if err != nil {
 			fmt.Println("Can't read file:", err)
 			return
 		}
 
-		if !strings.HasSuffix(*addFeatureFlag, ".feature") {
+		if !strings.HasSuffix(*featureAddFlag, ".feature") {
 			fmt.Println("File must end in .feature.")
 			return
 		}
 
-		featureFileName := extractNameFromPath(*addFeatureFlag)
+		featureFileName := extractNameFromPath(*featureAddFlag)
 		featureName := strings.TrimSuffix(featureFileName, ".feature")
 		exists, err := checkIfFeatureExists(host, featureName)
 		resErr = err
 		if resErr == nil {
-			if exists && !*replaceFlag {
+			if exists && !*featureReplaceFlag {
 				fmt.Printf("Feature '%s' already exists. Pass --replace to overwrite it.\n", featureName)
 				return
 			}
-			resContent, resCode, resErr = execRequest(host, "/features/"+featureName, "POST", string(content))
+			res, code, resErr = execRequest(host, "/features/"+featureName, "POST", string(content))
 		}
-	} else if *removeFeatureFlag != "" { // --remove-feature
-		fileWithoutExt := strings.TrimSuffix(*removeFeatureFlag, ".feature")
-		resContent, resCode, resErr = execRequest(host, "/features/"+fileWithoutExt, "DELETE", "")
-	} else if *listLogsFlag { // --logs
-		resContent, resCode, resErr = execRequest(host, "/logs", "GET", "")
-	} else if *logGetFlag != "" { // --log
-		resContent, resCode, resErr = execRequest(host, "/logs/" + *logGetFlag, "GET", "")
-	} else {
+
+	case *featureRemoveFlag != "":
+		fileWithoutExt := strings.TrimSuffix(*featureRemoveFlag, ".feature")
+		res, code, resErr = execRequest(host, "/features/"+fileWithoutExt, "DELETE", "")
+
+	case *featureDetailsFlag != "":
+		res, code, resErr = execRequest(host, "/features/"+*featureDetailsFlag, "GET", "")
+
+	// -log-*
+
+	case *logListFlag:
+		res, code, resErr = execRequest(host, "/logs", "GET", "")
+	case *logRemoveFlag != "":
+		res, code, resErr = execRequest(host, "/logs/"+*logRemoveFlag, "DELETE", "")
+	case *logGetFlag != "":
+		res, code, resErr = execRequest(host, "/logs/" + *logGetFlag, "GET", "")
+
+	default:
 		fmt.Println("No option given. Check -h to see options.")
 		return
 	}
 
-	// show request result (or an error)
 	if resErr != nil {
 		fmt.Println("Error during request:", resErr)
 		return
 	}
 
-	if resCode != http.StatusOK {
-		fmt.Println("HTTP code:", resCode)
-		fmt.Println(resContent)
-		return
+	if code != http.StatusOK {
+		fmt.Println("Request not OK: invalid HTTP Response:", code)
+		if res != "" {
+			fmt.Println("Details:")
+			fmt.Println(res)
+		}
+	} else {
+		fmt.Print(res)
 	}
-
-	fmt.Print(resContent)
 }
 
 func checkIfFeatureExists(host, name string) (bool, error) {
@@ -119,7 +137,7 @@ func execRequest(
 	endpoint string,
 	reqType string,
 	content string,
-) (resContent string, resCode int, err error) {
+) (result string, code int, err error) {
 	url := host + endpoint
 	var resp *http.Response
 
@@ -146,8 +164,8 @@ func execRequest(
 		return
 	}
 
-	resContent = string(bodyBytes)
-	resCode = resp.StatusCode
+	result = string(bodyBytes)
+	code = resp.StatusCode
 	return
 }
 
