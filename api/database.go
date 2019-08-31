@@ -39,10 +39,10 @@ func (f *ComplianceFeature) details() string {
 
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
-	Id            string // number of the log entry
-	DateTime      string // when this plan was validated
-	InputJson     string // the plan file json
-	Output        string // the compliance tool raw output
+	Id        string // number of the log entry
+	DateTime  string // when this plan was validated
+	InputJson string // the plan file json
+	Output    string // the compliance tool raw output
 }
 
 func (l *ValidationLog) id() string {
@@ -76,9 +76,9 @@ func (l *ValidationLog) details() string {
 
 	for feature, passing := range parsed.featurePassed {
 		if !passing {
-			sb.WriteString(fmt.Sprintf(" - %s FAILED: %s", feature, parsed.failMessages[feature][0]))
+			sb.WriteString(fmt.Sprintf(" - %s FAILED", feature))
 		} else {
-			sb.WriteString(fmt.Sprintf(" - %s OK (skipped or passed)", feature))
+			sb.WriteString(fmt.Sprintf(" - %s OK", feature))
 		}
 		sb.WriteRune('\n')
 	}
@@ -94,6 +94,16 @@ func (l *ValidationLog) details() string {
 		sb.WriteRune('\n')
 	}
 	return sb.String()
+}
+
+// TFState defines a remote TF state that must be checked for compliance
+// periodically.
+type TFState struct {
+	Id               string // maybe id should be 1,2,3,4 etc. to easily remove them.
+	Bucket, Path     string
+	State            string // the current state.
+	ComplianceResult string // the output for the compliance tool
+	LastUpdate       string // when was updated. "never" = not checked yet.
 }
 
 // defines table names for each type

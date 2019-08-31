@@ -77,8 +77,8 @@ func diffBetweenTFStates(oldJson, newJson string) (added []string, removed []str
 
 // complianceOutput contains the information extracted from a compliance output.
 type complianceOutput struct {
-	featurePassed map[string]bool // for each feature, true if passed or false otherwise.
-	failMessages map[string][]string // for each failed feature, lists all the error messages.
+	featurePassed map[string]bool     // for each feature, true if passed or false otherwise.
+	failMessages  map[string][]string // for each failed feature, lists all the error messages.
 }
 
 func (co complianceOutput) ErrorCount() int {
@@ -197,9 +197,8 @@ func runComplianceTool(fileContent []byte) (string, string, error) {
 	toolOutputBytes, err := exec.Command(tfComplianceBin, "-p", jsonTmpPath, "-f", featuresPath).CombinedOutput()
 	toolOutput := stripansi.Strip(string(toolOutputBytes))
 	if err != nil {
-		_, isExitError := err.(*exec.ExitError)
-		// ignore exit code errors, compliance throws them all the time.
-		if !isExitError {
+		_, ok := err.(*exec.ExitError)
+		if !ok { // ignore exit code errors, compliance throws them all the time.
 			return "", "", fmt.Errorf("tool execution error: %v", err)
 		}
 	}
