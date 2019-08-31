@@ -10,11 +10,19 @@ import (
 
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
-	Id        string // number of the log entry
-	DateTime  string // when this plan was validated
-	InputJson string // the plan file json
-	Output    string // the compliance tool raw output
+	Id            string // number of the log entry
+	DateTime      string // when this plan was validated
+	InputJson     string // the plan file json
+	Kind          string // "tfstate" or "validation".
+	Output        string // the compliance tool raw output
+	PrevInputJson string // for Kind tfstate. The previous json input.
+	PrevOutput    string // For Kind tfstate. The previous compliance output.
 }
+
+const (
+	logKindValidation = "validation"
+	logKindTFState    = "tfstate"
+)
 
 // restObject methods
 
@@ -72,6 +80,7 @@ func (l *ValidationLog) details() string {
 // database methods
 
 const validationLogTable = "logs"
+
 var validationLogAttributes = []string{"DateTime", "InputJson", "Output"}
 
 func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {

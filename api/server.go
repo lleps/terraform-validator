@@ -55,7 +55,25 @@ func initMonitoring() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for range ticker.C {
-			validateCurrentTerraformState()
+			objs, err := db.loadAllTFStates()
+			if err != nil {
+				log.Printf("can't get tfstates to check: %v", err)
+				continue
+			}
+
+			for _, obj := range objs {
+				changed, logEntry, err := checkTFState(obj)
+				if err != nil {
+					log.Printf("can't check TFState for state #%s (%s:%s): %v", obj.Id, obj.Bucket, obj.Path, err)
+					continue
+				}
+
+				if changed {
+					log.Printf("Bucket %s:%s changed state. Registered in log #%s", obj.Bucket, obj.Path, logEntry.Id)
+				} else {
+					log.Printf("Bucket %s:%s skipped (state didn't change),", obj.Bucket, obj.Path)
+				}
+			}
 		}
 	}()
 }
@@ -142,6 +160,10 @@ func initEndpoints() {
 			bucket := data["bucket"]
 			path := data["path"]
 
+			// TODO: instead of adding this raw, should
+			//  add this filled. Like, get the object
+			//  from S3, run compliance on it, and log
+			//  results.
 			if bucket == "" || path == "" {
 				return fmt.Errorf("'bucket' or 'path' not given")
 			}
@@ -162,36 +184,59 @@ func initEndpoints() {
 	http.Handle("/", r)
 }
 
-// validateCurrentTerraformState should fetch the state from the
-// configured buckets, and log its changes (if any).
-func validateCurrentTerraformState() {
-	bucketAndPath := "bucket " + s3Bucket + " path " + s3Path
-	fileBytes, err := getFileFromS3(s3Bucket, s3Path)
+// checkTFState checks if the given tfstate changed in S3.
+// if it did, runs the compliance and adds a new log entry.
+func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err error) {
+	fileBytes, err := getFileFromS3(state.Bucket, state.Path)
 	if err != nil {
-		log.Printf("error getting tf state from '%s': %v", bucketAndPath, err)
-		return
+		return false, nil, fmt.Errorf("can't get tfstate from s3: %v", err)
 	}
 
-	asJson, err := convertTerraformBinToJson(fileBytes)
+	actualState, err := convertTerraformBinToJson(fileBytes)
 	if err != nil {
-		log.Printf("Can't convert to json terraform state for '%s': %v", bucketAndPath, err)
-		return
+		return false, nil, fmt.Errorf("can't convert to json: %v", err)
 	}
 
-	_, output, err := runComplianceTool([]byte(asJson))
-	if err != nil {
-		log.Printf("can't run tool against the state: %v", err)
-		return
-	}
-	parsed, err := parseComplianceOutput(output)
-	if err != nil {
-		log.Printf("can't parse compliance out for '%s': %v", bucketAndPath, err)
-		return
+	// TODO: if features changed, should run too.
+	if actualState == state.State {
+		return false, nil, nil
 	}
 
-	fmt.Printf("result: %v", parsed)
+	changed = true
+	_, output, err := runComplianceTool([]byte(actualState))
+	if err != nil {
+		return true, nil, fmt.Errorf("can't run compliance tool: %v", err)
+	}
+
+	freeId, err := db.nextFreeValidationLogId()
+	if err != nil {
+		return true, nil, fmt.Errorf("can't get an id for a validationLog: %v", err)
+	}
+
+	// Register the log entry
+	now := time.Now().Format(time.Stamp)
+	logEntry = &ValidationLog{
+		Id:            freeId,
+		Kind:          logKindTFState,
+		DateTime:      now,
+		InputJson:     actualState,
+		Output:        output,
+		PrevInputJson: state.State,
+		PrevOutput:    state.ComplianceResult,
+	}
+	if err := db.insertOrUpdateValidationLog(logEntry); err != nil {
+		return true, nil, fmt.Errorf("can't insert logEntry on DB: %v", err)
+	}
+
+	// update the state
+	state.LastUpdate = now
+	state.State = actualState
+	state.ComplianceResult = output
+	if err := db.insertOrUpdateTFState(state); err != nil {
+		return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
+	}
+	return
 }
-
 
 // validateHandler takes a base64 string in the body with the plan file content
 // or terraform json, run the tfComplianceBin tool against it, and responds
@@ -212,15 +257,16 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		return "", 0, fmt.Errorf("can't get an id: %v", err)
 	}
 
-	record := ValidationLog{
+	logEntry := ValidationLog{
 		Id:        id,
+		Kind:      logKindValidation,
 		DateTime:  time.Now().Format(time.Stamp),
 		InputJson: complianceInput,
 		Output:    complianceOutput,
 	}
 
-	if err := db.insertOrUpdateValidationLog(&record); err != nil {
-		return "", 0, fmt.Errorf("can't put record in db: %v", err)
+	if err := db.insertOrUpdateValidationLog(&logEntry); err != nil {
+		return "", 0, fmt.Errorf("can't insert logEntry: %v", err)
 	}
 
 	return complianceOutput, http.StatusOK, nil
