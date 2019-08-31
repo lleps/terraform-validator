@@ -66,7 +66,7 @@ func initEndpoints() {
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router: r,
 		endpoint: "/features",
-		dbFetcher: func(db *database) ([]restObject, error) {
+		dbFetchFunc: func(db *database) ([]restObject, error) {
 			objs, err :=  db.loadAllFeatures()
 			if err != nil {
 				return nil, nil
@@ -77,11 +77,11 @@ func initEndpoints() {
 			}
 			return result, nil
 		},
-		dbRemover: func(db *database, id string) error {
+		dbRemoveFunc: func(db *database, id string) error {
 			defer func() { _ = syncFeaturesFolderFromDB() }()
 			return db.removeFeature(id)
 		},
-		dbInserter: func(db *database, body string) error {
+		dbInsertFunc: func(db *database, body string) error {
 			var data map[string]string
 			if err := json.Unmarshal([]byte(body), &data); err != nil {
 				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)
@@ -104,7 +104,7 @@ func initEndpoints() {
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router: r,
 		endpoint: "/logs",
-		dbFetcher: func(db *database) ([]restObject, error) {
+		dbFetchFunc: func(db *database) ([]restObject, error) {
 			objs, err :=  db.loadAllValidationLogs()
 			if err != nil {
 				return nil, nil
@@ -115,13 +115,13 @@ func initEndpoints() {
 			}
 			return result, nil
 		},
-		dbRemover: func(db *database, id string) error { return db.removeValidationLog(id) },
-		dbInserter: nil, // POST not supported
+		dbRemoveFunc: func(db *database, id string) error { return db.removeValidationLog(id) },
+		dbInsertFunc: nil, // POST not supported
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router: r,
 		endpoint: "/tfstates",
-		dbFetcher: func(db *database) ([]restObject, error) {
+		dbFetchFunc: func(db *database) ([]restObject, error) {
 			objs, err :=  db.loadAllTFStates()
 			if err != nil {
 				return nil, nil
@@ -132,8 +132,8 @@ func initEndpoints() {
 			}
 			return result, nil
 		},
-		dbRemover: func(db *database, id string) error { return db.removeTFState(id) },
-		dbInserter: func(db *database, body string) error {
+		dbRemoveFunc: func(db *database, id string) error { return db.removeTFState(id) },
+		dbInsertFunc: func(db *database, body string) error {
 			var data map[string]string
 			if err := json.Unmarshal([]byte(body), &data); err != nil {
 				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)

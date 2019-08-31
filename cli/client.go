@@ -111,7 +111,7 @@ func main() {
 		res, code, resErr = execRequest(host, "/tfstates/" + url.QueryEscape(*tfStateGetFlag), "GET", "")
 	case *tfStateAddFlag:
 		if *tfStateBucket == "" || *tfStatePath == "" {
-			fmt.Printf("Please specify -bucket and -path when adding a tfstate.")
+			fmt.Printf("Please specify -bucket and -path when adding a tfstate.\n")
 			return
 		}
 		body := map[string]string { "bucket": *tfStateBucket, "path": *tfStatePath }
