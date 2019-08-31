@@ -11,9 +11,9 @@ import (
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
 	Id            string // number of the log entry
+	Kind          string // "tfstate" or "validation".
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
-	Kind          string // "tfstate" or "validation".
 	Output        string // the compliance tool raw output
 	PrevInputJson string // for Kind tfstate. The previous json input.
 	PrevOutput    string // For Kind tfstate. The previous compliance output.
@@ -32,15 +32,44 @@ func (l *ValidationLog) id() string {
 
 func (l *ValidationLog) topLevel() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("%s | #%s ", l.DateTime, l.Id))
-	parsed, err := parseComplianceOutput(l.Output)
-	if err != nil {
-		return sb.String() + "<can't parse output>"
-	}
-	if parsed.ErrorCount() > 0 {
-		sb.WriteString(fmt.Sprintf("FAILED [%d of %d tests failed]", parsed.ErrorCount(), parsed.TestCount()))
+	sb.WriteString(fmt.Sprintf("%s #%s [%s] ", l.DateTime, l.Id, l.Kind))
+
+	if l.Kind == logKindTFState {
+		// 	+3, -4 lines. FAILING 2/6 -> FAILING 2/5
+		// first calculate state diff
+		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
+		sb.WriteString(fmt.Sprintf("+%d, -%d lines, ", len(added), len(removed)))
+
+		msgFunc := func(out string) string {
+			parsed, err := parseComplianceOutput(out)
+			if err != nil {
+				return err.Error()
+			}
+
+			if parsed.ErrorCount() > 0 {
+				return fmt.Sprintf("FAILING %d/%d", parsed.ErrorCount(), parsed.TestCount())
+			} else {
+				return fmt.Sprintf("FAILING %d/%d", parsed.TestCount(), parsed.TestCount())
+			}
+		}
+
+		if l.PrevOutput != "" {
+			sb.WriteString(msgFunc(l.PrevOutput))
+			sb.WriteString(" -> ")
+		}
+		sb.WriteString(msgFunc(l.Output))
+	} else if l.Kind == logKindValidation {
+		parsed, err := parseComplianceOutput(l.Output)
+		if err != nil {
+			return sb.String() + "<can't parse output>"
+		}
+		if parsed.ErrorCount() > 0 {
+			sb.WriteString(fmt.Sprintf("FAILED [%d of %d tests failed]", parsed.ErrorCount(), parsed.TestCount()))
+		} else {
+			sb.WriteString(fmt.Sprintf("PASSED [%d tests passed]", parsed.TestCount()))
+		}
 	} else {
-		sb.WriteString(fmt.Sprintf("PASSING [%d tests passed]", parsed.TestCount()))
+		sb.WriteString("<invalid kind: " + l.Kind + ">")
 	}
 	return sb.String()
 }
@@ -81,7 +110,7 @@ func (l *ValidationLog) details() string {
 
 const validationLogTable = "logs"
 
-var validationLogAttributes = []string{"DateTime", "InputJson", "Output"}
+var validationLogAttributes = []string{"Kind", "DateTime", "InputJson","Output", "PrevInputJson", "PrevOutput"}
 
 func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
 	var validationLogs []*ValidationLog
