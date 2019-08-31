@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -9,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -45,7 +45,7 @@ func main() {
 
 func initDB(prefix string) *database {
 	result := newDynamoDB(prefix)
-	if err := result.initTables(); err != nil {
+	if err := result.initTables(complianceFeatureTable, validationLogTable, tfStateTable); err != nil {
 		log.Fatalf("Can't make database table: %v", err)
 	}
 	return result
@@ -55,7 +55,7 @@ func initMonitoring() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for range ticker.C {
-			//validateCurrentTerraformState()
+			validateCurrentTerraformState()
 		}
 	}()
 }
@@ -81,14 +81,24 @@ func initEndpoints() {
 			defer func() { _ = syncFeaturesFolderFromDB() }()
 			return db.removeFeature(id)
 		},
-		dbInserter: func(db *database, urlVars map[string]string, body string) error {
-			featureName := urlVars["id"]
-			if !validateFeatureName(featureName) {
-				return fmt.Errorf("invalid feature name: '%s'", featureName)
+		dbInserter: func(db *database, body string) error {
+			var data map[string]string
+			if err := json.Unmarshal([]byte(body), &data); err != nil {
+				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)
+			}
+
+			name := data["name"]
+			source := data["source"]
+
+			if name == "" || source == "" {
+				return fmt.Errorf("'name' or 'source' not given")
+			}
+			if !validateFeatureName(name) {
+				return fmt.Errorf("invalid feature name: '%s'", name)
 			}
 
 			defer func() { _ = syncFeaturesFolderFromDB() }()
-			return db.insertOrUpdateFeature(&ComplianceFeature{featureName, body})
+			return db.insertOrUpdateFeature(&ComplianceFeature{name, source})
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
@@ -108,24 +118,78 @@ func initEndpoints() {
 		dbRemover: func(db *database, id string) error { return db.removeValidationLog(id) },
 		dbInserter: nil, // POST not supported
 	})
+	registerCollectionEndpoint(db, collectionEndpointBuilder{
+		router: r,
+		endpoint: "/tfstates",
+		dbFetcher: func(db *database) ([]restObject, error) {
+			objs, err :=  db.loadAllTFStates()
+			if err != nil {
+				return nil, nil
+			}
+			result := make([]restObject, len(objs))
+			for i, o := range objs {
+				result[i] = o
+			}
+			return result, nil
+		},
+		dbRemover: func(db *database, id string) error { return db.removeTFState(id) },
+		dbInserter: func(db *database, body string) error {
+			var data map[string]string
+			if err := json.Unmarshal([]byte(body), &data); err != nil {
+				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)
+			}
+
+			bucket := data["bucket"]
+			path := data["path"]
+
+			if bucket == "" || path == "" {
+				return fmt.Errorf("'bucket' or 'path' not given")
+			}
+
+			id, err := db.nextFreeTFStateId()
+			if err != nil {
+				return fmt.Errorf("can't get id: %v", err)
+			}
+
+			return db.insertOrUpdateTFState(&TFState{
+				Id: id,
+				Bucket: bucket,
+				Path: path,
+			})
+		},
+	})
+
 	http.Handle("/", r)
 }
 
 // validateCurrentTerraformState should fetch the state from the
 // configured buckets, and log its changes (if any).
 func validateCurrentTerraformState() {
+	bucketAndPath := "bucket " + s3Bucket + " path " + s3Path
 	fileBytes, err := getFileFromS3(s3Bucket, s3Path)
 	if err != nil {
-		log.Printf("error getting tf state from s3: %v", err)
+		log.Printf("error getting tf state from '%s': %v", bucketAndPath, err)
 		return
 	}
 
-	_, output, err := runComplianceTool(fileBytes)
+	asJson, err := convertTerraformBinToJson(fileBytes)
+	if err != nil {
+		log.Printf("Can't convert to json terraform state for '%s': %v", bucketAndPath, err)
+		return
+	}
+
+	_, output, err := runComplianceTool([]byte(asJson))
 	if err != nil {
 		log.Printf("can't run tool against the state: %v", err)
 		return
 	}
-	fmt.Printf("result: %s", output)
+	parsed, err := parseComplianceOutput(output)
+	if err != nil {
+		log.Printf("can't parse compliance out for '%s': %v", bucketAndPath, err)
+		return
+	}
+
+	fmt.Printf("result: %v", parsed)
 }
 
 
@@ -138,28 +202,18 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
-	// run terraform-compliance
 	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes)
 	if err != nil {
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}
 
-	// Calculate an ID for the validation
-	maxId := 0
-	records, err := db.loadAllValidationLogs()
+	id, err := db.nextFreeValidationLogId()
 	if err != nil {
-		return "", 0, err
-	}
-	for _, record := range records {
-		recordId, _ := strconv.ParseInt(record.Id, 10, 64)
-		if int(recordId) > maxId {
-			maxId = int(recordId)
-		}
+		return "", 0, fmt.Errorf("can't get an id: %v", err)
 	}
 
-	// log it
 	record := ValidationLog{
-		Id:        strconv.Itoa(maxId + 1),
+		Id:        id,
 		DateTime:  time.Now().Format(time.Stamp),
 		InputJson: complianceInput,
 		Output:    complianceOutput,
@@ -172,7 +226,7 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 	return complianceOutput, http.StatusOK, nil
 }
 
-// syncFeaturesFolderFromDB writes all the features in the database onto featuresPath.
+// syncFeaturesFolderFromDB writes all the feature files that terraform-compliance requires.
 func syncFeaturesFolderFromDB() error {
 	// Empty the folder
 	if err := os.RemoveAll(featuresPath); err != nil {

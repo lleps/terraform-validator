@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -25,6 +27,13 @@ func main() {
 	logListFlag := flag.Bool("log-list", false, "List all logs")
 	logGetFlag := flag.String("log-details", "", "Get the info of the given log")
 	logRemoveFlag := flag.String("log-remove", "", "Remove the log entry with the given id")
+	// tfstates
+	tfStateListFlag := flag.Bool("tfstate-list", false, "List all tfstates monitored")
+	tfStateGetFlag := flag.String("tfstate-details", "", "Get the info of the given tfsatte")
+	tfStateAddFlag := flag.Bool("tfstate-add", false, "Adds a new tfstate (along with -bucket and -path)")
+	tfStateRemoveFlag := flag.String("tfstate-remove", "", "Remove the tfstate entry with the given id")
+	tfStateBucket := flag.String("bucket", "", "When -tfstate-add. To specify the bucket to add.")
+	tfStatePath := flag.String("path", "", "When -tfstate-add. To specify the path to add.")
 
 	flag.Parse()
 
@@ -73,24 +82,40 @@ func main() {
 				fmt.Printf("Feature '%s' already exists. Pass --replace to overwrite it.\n", featureName)
 				return
 			}
-			res, code, resErr = execRequest(host, "/features/"+featureName, "POST", string(content))
+			body := map[string]string { "name": featureName, "source": string(content) }
+			res, code, resErr = execRequest(host, "/features", "POST", body)
 		}
 
 	case *featureRemoveFlag != "":
 		fileWithoutExt := strings.TrimSuffix(*featureRemoveFlag, ".feature")
-		res, code, resErr = execRequest(host, "/features/"+fileWithoutExt, "DELETE", "")
+		res, code, resErr = execRequest(host, "/features/" + url.QueryEscape(fileWithoutExt), "DELETE", "")
 
 	case *featureDetailsFlag != "":
-		res, code, resErr = execRequest(host, "/features/"+*featureDetailsFlag, "GET", "")
+		res, code, resErr = execRequest(host, "/features/" + url.QueryEscape(*featureDetailsFlag), "GET", "")
 
 	// -log-*
 
 	case *logListFlag:
 		res, code, resErr = execRequest(host, "/logs", "GET", "")
 	case *logRemoveFlag != "":
-		res, code, resErr = execRequest(host, "/logs/"+*logRemoveFlag, "DELETE", "")
+		res, code, resErr = execRequest(host, "/logs/" + url.QueryEscape(*logRemoveFlag), "DELETE", "")
 	case *logGetFlag != "":
-		res, code, resErr = execRequest(host, "/logs/" + *logGetFlag, "GET", "")
+		res, code, resErr = execRequest(host, "/logs/" + url.QueryEscape(*logGetFlag), "GET", "")
+
+	// -tfstate-*
+	case *tfStateListFlag:
+		res, code, resErr = execRequest(host, "/tfstates", "GET", "")
+	case *tfStateRemoveFlag != "":
+		res, code, resErr = execRequest(host, "/tfstates/" + url.QueryEscape(*tfStateRemoveFlag), "DELETE", "")
+	case *tfStateGetFlag != "":
+		res, code, resErr = execRequest(host, "/tfstates/" + url.QueryEscape(*tfStateGetFlag), "GET", "")
+	case *tfStateAddFlag:
+		if *tfStateBucket == "" || *tfStatePath == "" {
+			fmt.Printf("Please specify -bucket and -path when adding a tfstate.")
+			return
+		}
+		body := map[string]string { "bucket": *tfStateBucket, "path": *tfStatePath }
+		res, code, resErr = execRequest(host, "/tfstates", "POST", body)
 
 	default:
 		fmt.Println("No option given. Check -h to see options.")
@@ -103,9 +128,8 @@ func main() {
 	}
 
 	if code != http.StatusOK {
-		fmt.Println("Request not OK: invalid HTTP Response:", code)
+		fmt.Println("Invalid HTTP Response:", code)
 		if res != "" {
-			fmt.Println("Details:")
 			fmt.Println(res)
 		}
 	} else {
@@ -136,19 +160,24 @@ func execRequest(
 	host string,
 	endpoint string,
 	reqType string,
-	content string,
+	body interface{},
 ) (result string, code int, err error) {
 	url := host + endpoint
+	marshaled, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	bodyJson := string(marshaled)
 	var resp *http.Response
 
 	switch reqType {
 	case "POST":
-		resp, err = http.Post(url, "text/plain", strings.NewReader(content))
+		resp, err = http.Post(url, "text/plain", strings.NewReader(bodyJson))
 	case "GET":
 		resp, err = http.Get(url)
 	case "DELETE":
 		client := &http.Client{}
-		req, err := http.NewRequest("DELETE", url, strings.NewReader(content))
+		req, err := http.NewRequest("DELETE", url, strings.NewReader(bodyJson))
 		if err == nil {
 			resp, err = client.Do(req)
 		}

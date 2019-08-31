@@ -1,11 +1,10 @@
 // This file provides an easy-to-use interface to store and
-// retrieve some defined items from a database, without
-// having to worry about dynamo-specific code.
+// retrieve some items from a DynamoDB database, without
+// having to worry about DynamoDB-specific code.
 
 package main
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -15,107 +14,6 @@ import (
 	"log"
 	"strings"
 	"time"
-)
-
-// Item type definitions. Every persistent item should have an "Id"!
-
-// ComplianceFeature stores a feature to test terraform code against.
-type ComplianceFeature struct {
-	Id            string // name of the feature
-	FeatureSource string // gherkin source code of the feature
-}
-
-func (f *ComplianceFeature) id() string {
-	return f.Id
-}
-
-func (f *ComplianceFeature) topLevel() string {
-	return f.Id
-}
-
-func (f *ComplianceFeature) details() string {
-	return f.FeatureSource
-}
-
-// ValidationLog stores a validation event information.
-type ValidationLog struct {
-	Id        string // number of the log entry
-	DateTime  string // when this plan was validated
-	InputJson string // the plan file json
-	Output    string // the compliance tool raw output
-}
-
-func (l *ValidationLog) id() string {
-	return l.Id
-}
-
-func (l *ValidationLog) topLevel() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("%s | #%s ", l.DateTime, l.Id))
-	parsed, err := parseComplianceOutput(l.Output)
-	if err != nil {
-		return sb.String() + "<can't parse output>"
-	}
-	if parsed.ErrorCount() > 0 {
-		sb.WriteString(fmt.Sprintf("FAILED [%d of %d tests failed]", parsed.ErrorCount(), parsed.TestCount()))
-	} else {
-		sb.WriteString(fmt.Sprintf("PASSING [%d tests passed]", parsed.TestCount()))
-	}
-	return sb.String()
-}
-
-func (l *ValidationLog) details() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", "manual validaton", l.DateTime))
-	sb.WriteString("\n")
-	sb.WriteString("Features:\n")
-	parsed, err := parseComplianceOutput(l.Output)
-	if err != nil {
-		return sb.String() + "<can't parse output: " + err.Error() + ">"
-	}
-
-	for feature, passing := range parsed.featurePassed {
-		if !passing {
-			sb.WriteString(fmt.Sprintf(" - %s FAILED", feature))
-		} else {
-			sb.WriteString(fmt.Sprintf(" - %s OK", feature))
-		}
-		sb.WriteRune('\n')
-	}
-	sb.WriteRune('\n')
-
-	if parsed.ErrorCount() > 0 {
-		sb.WriteString("Errors:\n")
-		for k, errors := range parsed.failMessages {
-			for _, e := range errors {
-				sb.WriteString(fmt.Sprintf(" - %s: %s\n", k, e))
-			}
-		}
-		sb.WriteRune('\n')
-	}
-	return sb.String()
-}
-
-// TFState defines a remote TF state that must be checked for compliance
-// periodically.
-type TFState struct {
-	Id               string // maybe id should be 1,2,3,4 etc. to easily remove them.
-	Bucket, Path     string
-	State            string // the current state.
-	ComplianceResult string // the output for the compliance tool
-	LastUpdate       string // when was updated. "never" = not checked yet.
-}
-
-// defines table names for each type
-const (
-	complianceFeatureTable = "features"
-	validationLogTable     = "logs"
-)
-
-// defines the attributes for each type, used to build projections in dynamo.
-var (
-	complianceFeatureAttributes = []string{"FeatureSource"}
-	validationLogAttributes     = []string{"DateTime", "InputJson", "Output"}
 )
 
 type database struct {
@@ -131,9 +29,6 @@ func newDynamoDB(tablePrefix string) *database {
 
 	return &database{dynamodb.New(sess), tablePrefix}
 }
-
-// Generic table methods. Those should not be used outside this file.
-// Instead, type-specific methods (defined below) should be used.
 
 // tableFor returns the full database table ({prefix}_{name}).
 func (db *database) tableFor(name string) string {
@@ -256,71 +151,13 @@ func (db *database) removeGeneric(tableName string, id string) error {
 	return nil
 }
 
-// Type-Specific method definitions.
-
 // initTables will ensure all the necessary DynamoDB tables exists.
-func (db *database) initTables() error {
-	if err := db.initTable(db.tableFor(complianceFeatureTable)); err != nil {
-		return err
-	}
-	if err := db.initTable(db.tableFor(validationLogTable)); err != nil {
-		return err
+// tables should omit the prefix.
+func (db *database) initTables(tables ...string) error {
+	for _, table := range tables {
+		if err := db.initTable(db.tableFor(table)); err != nil {
+			return err
+		}
 	}
 	return nil
-}
-
-// insertOrUpdateFeature inserts or updates the given feature on the database.
-func (db *database) insertOrUpdateFeature(feature *ComplianceFeature) error {
-	return db.insertOrUpdateGeneric(db.tableFor(complianceFeatureTable), feature)
-}
-
-// insertOrUpdateValidationLog inserts or updates the given validation log on the database.
-func (db *database) insertOrUpdateValidationLog(validationLog *ValidationLog) error {
-	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), validationLog)
-}
-
-// loadAllFeatures returns all the ComplianceFeature items on the database.
-func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
-	var features []*ComplianceFeature
-	err := db.loadAllGeneric(
-		db.tableFor(complianceFeatureTable),
-		complianceFeatureAttributes,
-		func(i map[string]*dynamodb.AttributeValue) error {
-			var elem ComplianceFeature
-			err := dynamodbattribute.UnmarshalMap(i, &elem)
-			if err == nil {
-				features = append(features, &elem)
-			}
-			return err
-		})
-
-	return features, err
-}
-
-// loadAllValidationLogs returns all the ValidationLog items on the database.
-func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
-	var validationLogs []*ValidationLog
-	err := db.loadAllGeneric(
-		db.tableFor(validationLogTable),
-		validationLogAttributes,
-		func(i map[string]*dynamodb.AttributeValue) error {
-			var elem ValidationLog
-			err := dynamodbattribute.UnmarshalMap(i, &elem)
-			if err == nil {
-				validationLogs = append(validationLogs, &elem)
-			}
-			return err
-		})
-
-	return validationLogs, err
-}
-
-// removeFeature removes the first feature whose Id is id.
-func (db *database) removeFeature(id string) error {
-	return db.removeGeneric(db.tableFor(complianceFeatureTable), id)
-}
-
-// removeValidationLog removes the first validation log whose Id is id.
-func (db *database) removeValidationLog(id string) error {
-	return db.removeGeneric(db.tableFor(validationLogTable), id)
 }
