@@ -76,8 +76,27 @@ func (l *ValidationLog) topLevel() string {
 
 func (l *ValidationLog) details() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", "manual validaton", l.DateTime))
 	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", l.Kind, l.DateTime))
+	sb.WriteString("\n")
+
+	// print difference for tfstate only
+	if l.Kind == logKindTFState {
+		sb.WriteString("Differences:")
+		sb.WriteString("\n")
+		sb.WriteString("\n")
+		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
+		for _, line := range added {
+			sb.WriteString("+ " + line + "\n")
+		}
+		sb.WriteString("\n")
+		for _, line := range removed {
+			sb.WriteString("- " + line + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	// print features
 	sb.WriteString("Features:\n")
 	parsed, err := parseComplianceOutput(l.Output)
 	if err != nil {
