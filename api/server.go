@@ -18,11 +18,13 @@ const (
 	featuresPath = "./features"
 )
 
-var db *database
+var (
+	listenFlag = flag.String("listen", ":8080", "On which address to listen")
+	dynamoPrefixFlag = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
+	db *database
+)
 
 func main() {
-	listenFlag := flag.String("listen", ":8080", "On which address to listen")
-	dynamoPrefixFlag := flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
 	flag.Parse()
 
 	log.Printf("Init DynamoDB table '%s'...", *dynamoPrefixFlag)
@@ -217,6 +219,7 @@ func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err er
 		DateTime:      now,
 		InputJson:     actualState,
 		Output:        output,
+		Details:       state.Bucket + ":" + state.Path,
 		PrevInputJson: state.State,
 		PrevOutput:    state.ComplianceResult,
 	}

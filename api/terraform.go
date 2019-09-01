@@ -16,6 +16,8 @@ import (
 const (
 	tfComplianceBin = "terraform-compliance"
 	tfBin           = "terraform"
+	passedMsg       = "[32mPASSED[0m"
+	failedMsg       = "[31mFAILED[0m"
 )
 
 // convertTerraformBinToJson converts a TF file state (like plan.out) to a
@@ -177,6 +179,38 @@ func (co complianceOutput) TestCount() int {
 
 func (co complianceOutput) PassedCount() int {
 	return co.TestCount() - co.ErrorCount()
+}
+
+func (co complianceOutput) String() string {
+	errors := co.ErrorCount()
+	tests := co.TestCount()
+	sb := strings.Builder{}
+	sb.WriteString("Features:\n")
+	failMsgs := make([]string, 0)
+	for name, passed := range co.featurePassed {
+		if passed {
+			sb.WriteString(fmt.Sprintf("- %s %s", name, passedMsg))
+		} else {
+			sb.WriteString(fmt.Sprintf("- %s %s", name, failedMsg))
+			for _, msg := range co.failMessages[name] {
+				failMsgs = append(failMsgs, name + ": " + msg)
+			}
+		}
+		sb.WriteString("\n")
+	}
+	sb.WriteString("\n")
+
+	if errors > 0 {
+		sb.WriteString("Errors:\n")
+		for _, msg := range failMsgs {
+			sb.WriteString(fmt.Sprintf("- %s\n", msg))
+		}
+		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf("%s\n", failedMsg))
+	} else {
+		sb.WriteString(fmt.Sprintf("%s (%d tests)\n", passedMsg, tests))
+	}
+	return sb.String()
 }
 
 // extractNameFromPath takes the file name from the whole path,

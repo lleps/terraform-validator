@@ -16,6 +16,7 @@ type ValidationLog struct {
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
 	Output        string // the compliance tool raw output
+	Details       string // optional. For kind tfstate, is bucket:path.
 	PrevInputJson string // for Kind tfstate. The previous json input.
 	PrevOutput    string // For Kind tfstate. The previous compliance output.
 }
@@ -23,9 +24,6 @@ type ValidationLog struct {
 const (
 	logKindValidation = "validation"
 	logKindTFState    = "tfstate"
-	cliG              = "[32m" // green
-	cliR              = "[31m" // red
-	cliD              = "[0m" // default
 )
 
 // restObject methods
@@ -36,43 +34,31 @@ func (l *ValidationLog) id() string {
 
 func (l *ValidationLog) topLevel() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("%s #%s [%s] ", l.DateTime, l.Id, l.Kind))
+	sb.WriteString(fmt.Sprintf("#%s | %s | %s | ", l.Id, l.DateTime, l.Kind))
 
-	if l.Kind == logKindTFState {
-		// 	+3, -4 lines. FAILING 2/6 -> FAILING 2/5
-		// first calculate state diff
+	if l.Kind == logKindTFState { // For tf state, show line changed and compliance changes.
 		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
-		sb.WriteString(fmt.Sprintf("+%d, -%d lines, ", len(added), len(removed)))
-
+		sb.WriteString(fmt.Sprintf("%s | +%d, -%d lines | ", l.Details, len(added), len(removed)))
 		msgFunc := func(out string) string {
-			parsed, err := parseComplianceOutput(out)
-			if err != nil {
-				return err.Error()
-			}
-
+			parsed, _ := parseComplianceOutput(out)
 			if parsed.ErrorCount() > 0 {
-				return fmt.Sprintf("%sFAILING %d/%d", cliR, parsed.ErrorCount(), parsed.TestCount())
+				return fmt.Sprintf("%s %d/%d", failedMsg, parsed.ErrorCount(), parsed.TestCount())
 			} else {
-				return fmt.Sprintf("%sOK %d/%d", cliG, parsed.TestCount(), parsed.TestCount())
+				return fmt.Sprintf("%s %d/%d", passedMsg, parsed.TestCount(), parsed.TestCount())
 			}
 		}
 
 		if l.PrevOutput != "" {
 			sb.WriteString(msgFunc(l.PrevOutput))
-			sb.WriteString(cliD)
 			sb.WriteString(" -> ")
 		}
 		sb.WriteString(msgFunc(l.Output))
-		sb.WriteString(cliD)
-	} else if l.Kind == logKindValidation {
-		parsed, err := parseComplianceOutput(l.Output)
-		if err != nil {
-			return sb.String() + "<can't parse output>"
-		}
+	} else if l.Kind == logKindValidation { // For validations, just show compliance result
+		parsed, _ := parseComplianceOutput(l.Output)
 		if parsed.ErrorCount() > 0 {
-			sb.WriteString(fmt.Sprintf("FAILED [%d of %d tests failed]", parsed.ErrorCount(), parsed.TestCount()))
+			sb.WriteString(fmt.Sprintf("%s %d/%d", failedMsg, parsed.ErrorCount(), parsed.TestCount()))
 		} else {
-			sb.WriteString(fmt.Sprintf("OK [%d tests passed]", parsed.TestCount()))
+			sb.WriteString(fmt.Sprintf("%s %d/%d", passedMsg, parsed.TestCount(), parsed.TestCount()))
 		}
 	} else {
 		sb.WriteString("<invalid kind: " + l.Kind + ">")
@@ -82,15 +68,19 @@ func (l *ValidationLog) topLevel() string {
 
 func (l *ValidationLog) details() string {
 	sb := strings.Builder{}
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", l.Kind, l.DateTime))
-	sb.WriteString("\n")
 
-	// print difference for tfstate only
+	// header
+	sb.WriteString("\n")
 	if l.Kind == logKindTFState {
+		sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", l.Details, l.DateTime))
+	} else {
+		sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", l.Kind, l.DateTime))
+	}
+	sb.WriteString("\n")
 
+	// tfstate only: json difference
+	if l.Kind == logKindTFState {
 		sb.WriteString("Differences:")
-		sb.WriteString("\n")
 		sb.WriteString("\n")
 		diff := diffmatchpatch.New()
 		diffs := diff.DiffMain(l.PrevInputJson, l.InputJson, false)
@@ -98,40 +88,16 @@ func (l *ValidationLog) details() string {
 		sb.WriteString("\n")
 	}
 
-	// print features
-	sb.WriteString("Features:\n")
-	parsed, err := parseComplianceOutput(l.Output)
-	if err != nil {
-		return sb.String() + "<can't parse output: " + err.Error() + ">"
-	}
-
-	for feature, passing := range parsed.featurePassed {
-		if !passing {
-			sb.WriteString(fmt.Sprintf(" - %s FAILED", feature))
-		} else {
-			sb.WriteString(fmt.Sprintf(" - %s OK", feature))
-		}
-		sb.WriteRune('\n')
-	}
-	sb.WriteRune('\n')
-
-	if parsed.ErrorCount() > 0 {
-		sb.WriteString("Errors:\n")
-		for k, errors := range parsed.failMessages {
-			for _, e := range errors {
-				sb.WriteString(fmt.Sprintf(" - %s: %s\n", k, e))
-			}
-		}
-		sb.WriteRune('\n')
-	}
+	// Features
+	parsed, _ := parseComplianceOutput(l.Output)
+	sb.WriteString(parsed.String())
 	return sb.String()
 }
 
 // database methods
 
 const validationLogTable = "logs"
-
-var validationLogAttributes = []string{"Kind", "DateTime", "InputJson","Output", "PrevInputJson", "PrevOutput"}
+var validationLogAttributes = []string{"Kind", "DateTime", "InputJson","Output", "Details", "PrevInputJson", "PrevOutput"}
 
 func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
 	var validationLogs []*ValidationLog
