@@ -16,8 +16,6 @@ import (
 
 const (
 	featuresPath = "./features"
-	s3Bucket = "mybucket-gagagagagagag-2020"
-	s3Path = "path/to/my/key"
 )
 
 var db *database
