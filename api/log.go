@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"strconv"
 	"strings"
 )
@@ -82,21 +83,13 @@ func (l *ValidationLog) details() string {
 
 	// print difference for tfstate only
 	if l.Kind == logKindTFState {
+
 		sb.WriteString("Differences:")
 		sb.WriteString("\n")
 		sb.WriteString("\n")
-		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
-		added = trimIndentationLevel(added, 2)
-		removed = trimIndentationLevel(removed, 2)
-		added = resumeDiff(added, 40)
-		removed = resumeDiff(removed, 40)
-		for _, line := range added {
-			sb.WriteString("+ " + line + "\n")
-		}
-		sb.WriteString("\n")
-		for _, line := range removed {
-			sb.WriteString("- " + line + "\n")
-		}
+		diff := diffmatchpatch.New()
+		diffs := diff.DiffMain(l.PrevInputJson, l.InputJson, false)
+		sb.WriteString(diff.DiffPrettyText(diffs))
 		sb.WriteString("\n")
 	}
 
