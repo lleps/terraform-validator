@@ -75,6 +75,86 @@ func diffBetweenTFStates(oldJson, newJson string) (added []string, removed []str
 	return
 }
 
+// getLineIndentationLevel returns how deeply indented is a line.
+func getLineIndentationLevel(s string) (deep int) {
+	for _, c := range s {
+		if c != '\t' {
+			break
+		}
+		deep++
+	}
+	return
+}
+
+// trimIndentationLevel only keeps the lines at level
+// or more levels of indentations.
+func trimIndentationLevel(lines []string, level int) []string {
+	result := make([]string, 0)
+	sb := strings.Builder{}
+	for i := 0; i < level; i++ {
+		sb.WriteRune('\t')
+	}
+	trimmedIndentation := sb.String()
+	for _, line := range lines {
+		depth := getLineIndentationLevel(line)
+		if depth >= level {
+			result = append(result, strings.TrimPrefix(line, trimmedIndentation))
+		}
+	}
+	return result
+}
+
+// resumeDiff makes sure the given diff (ie lines of json) is
+// at least limit characters, by compacting deeper levels
+// as ... n fields omitted.
+func resumeDiff(lines []string, limit int) []string {
+	// get deepest level
+	maxDepth := 0
+	for _, line := range lines {
+		depth := getLineIndentationLevel(line)
+		if depth > maxDepth {
+			maxDepth = depth
+		}
+	}
+
+	result := lines // on which array to iterate.
+	for {
+		// we're done if this is true.
+		if len(result) <= limit {
+			return result
+		}
+
+		// decrease tolerance
+		maxDepth--
+		if maxDepth <= 0 {
+			return result
+		}
+
+		// add here only lines whose depth <= maxDepth
+		newResult := make([]string, 0)
+		ignoredLines := 0 // counter for "omitted fields".
+		for _, line := range result {
+			depth := getLineIndentationLevel(line)
+			if depth > maxDepth {
+				ignoredLines++
+			} else {
+				if ignoredLines > 0 {
+					// maybe just ignore those. later may be added.
+					sb := strings.Builder{}
+					for i := 0; i < maxDepth + 1; i++ {
+						sb.WriteRune('\t')
+					}
+					sb.WriteString(fmt.Sprintf("... %d lines omitted", ignoredLines))
+					newResult = append(newResult, sb.String())
+					ignoredLines = 0
+				}
+				newResult = append(newResult, line)
+			}
+		}
+		result = newResult
+	}
+}
+
 // complianceOutput contains the information extracted from a compliance output.
 type complianceOutput struct {
 	featurePassed map[string]bool     // for each feature, true if passed or false otherwise.

@@ -86,6 +86,10 @@ func (l *ValidationLog) details() string {
 		sb.WriteString("\n")
 		sb.WriteString("\n")
 		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
+		added = trimIndentationLevel(added, 2)
+		removed = trimIndentationLevel(removed, 2)
+		added = resumeDiff(added, 40)
+		removed = resumeDiff(removed, 40)
 		for _, line := range added {
 			sb.WriteString("+ " + line + "\n")
 		}

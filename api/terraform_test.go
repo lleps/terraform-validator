@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 )
 
@@ -13,12 +14,38 @@ func TestConvertTerraformBinToJson(t *testing.T) {
 		return
 	}
 
-	planBytes, err := base64.StdEncoding.DecodeString(planDataB64)
+	planBytes, err := base64.StdEncoding.DecodeString(convertTFPlanDataB64)
 	require.Nil(t, err, "cant decode plan data")
 
 	asJson, err := convertTerraformBinToJson(planBytes)
 	require.Nil(t, err, "convertTerraformBinToJson failed")
-	assert.Equal(t, expectedJson, asJson, "bad json")
+	assert.Equal(t, convertTFExpectedJson, asJson, "bad json")
+}
+
+func TestTrimPreIndentationLevel(t *testing.T) {
+	given := `{
+	"key": 123,
+	"values": [
+		"ids": [
+			1,
+			2,
+			3
+		]
+	]
+}`
+	expected := `"ids": [
+	1,
+	2,
+	3
+]`
+	givenLines := strings.Split(given, "\n")
+	expectedLines := strings.Split(expected, "\n")
+	assert.Equal(t, expectedLines, trimIndentationLevel(givenLines, 2))
+}
+
+func TestResumeDiff(t *testing.T) {
+	givenLines := strings.Split(resumeDiffGiven, "\n")
+	assert.Equal(t, resumeDiffExpected, resumeDiff(givenLines, 40))
 }
 
 func TestDiffBetweenTFStates(t *testing.T) {
@@ -50,7 +77,7 @@ func TestExtractNameFromPath(t *testing.T) {
 }
 
 func TestParseComplianceOutput(t *testing.T) {
-	got, err := parseComplianceOutput(complianceOut)
+	got, err := parseComplianceOutput(runComplianceExpectedOut)
 	require.Nil(t, err, "cant parse out")
 
 	expected := complianceOutput{
@@ -78,7 +105,7 @@ func TestParseComplianceOutput(t *testing.T) {
 	assert.Equal(t, 3, got.TestCount(), "bad TestCount")
 }
 
-var complianceOut = `
+const runComplianceExpectedOut = `
 terraform-compliance v1.0.37 initiated
 
 . Converting terraform plan file.
@@ -142,7 +169,7 @@ Feature: Resources should be properly tagged  # /media/lleps/Compartido/Dev/terr
 `
 
 // plan.out binary content as base64
-var planDataB64 = "UEsDBBQACAAIAFShGE8AAAAAAAAAAAAAAAAGAAkAdGZwbGFuVVQFAAHxw2FdpJQ/bBxFFMb3EmFbp1QuELoKrUCCKGf57sz5cElJmYpu" +
+const convertTFPlanDataB64 = "UEsDBBQACAAIAFShGE8AAAAAAAAAAAAAAAAGAAkAdGZwbGFuVVQFAAHxw2FdpJQ/bBxFFMb3EmFbp1QuELoKrUCCKGf57sz5cElJmYpu" +
 	"9HbmnffhnT+amd3L2bIQEQ0NgYKSBkfETrBjo8gIQbGQChoE2sYNJYiCAiEkJBo0e3gdO6EhW+187+3MvN/73i5c7hzPd67AxDFS" +
 	"zoPiGM/jDZAmw9euGKsLEmiXYOJef3duobX4zlz77bmfoqs7IOlTkNTtr76yOh4OejtgVRVFX4JzmhN4ZCZPMuKMDAMhLDpXRdER" +
 	"FEAZJJSRn7JNrbCKogNucsa1RcZ1rnwVRQ+C4lOLIBwzaOtorVsU5JkzyGlMHDxp9f7nghwkGTIwxDxaSaoOlIeYOJZkmm8wgQXx" +
@@ -167,7 +194,7 @@ var planDataB64 = "UEsDBBQACAAIAFShGE8AAAAAAAAAAAAAAAAGAAkAdGZwbGFuVVQFAAHxw2Fdp
 	"AAAQBQAAdGZjb25maWcvbW9kdWxlcy5qc29uVVQFAAHxw2FdUEsFBgAAAAAEAAQAFAEAAIUFAAAAAA=="
 
 // the plan.out output prettified
-var expectedJson = `{
+const convertTFExpectedJson = `{
 	"format_version": "0.1",
 	"terraform_version": "0.12.6",
 	"planned_values": {
@@ -363,3 +390,148 @@ var expectedJson = `{
 	}
 }
 `
+
+const resumeDiffGiven = `{
+	"format_version": "0.1",
+	"terraform_version": "0.12.6",
+	"values": {
+		"root_module": {
+			"resources": [
+				{
+					"address": "aws_eip.ip",
+					"mode": "managed",
+					"type": "aws_eip",
+					"name": "ip",
+					"provider_name": "aws",
+					"schema_version": 0,
+					"values": {
+						"allocation_id": null,
+						"associate_with_private_ip": null,
+						"association_id": "eipassoc-05285639a19feb265",
+						"domain": "vpc",
+						"id": "eipalloc-04061cf4360189403",
+						"instance": "i-072f8ebcec3192bc9",
+						"network_interface": "eni-040ac8eec3d099b5e",
+						"private_dns": "ip-172-31-94-61.ec2.internal",
+						"private_ip": "172.31.94.61",
+						"public_dns": "ec2-3-227-221-13.compute-1.amazonaws.com",
+						"public_ip": "3.227.221.13",
+						"public_ipv4_pool": "amazon",
+						"tags": null,
+						"timeouts": null,
+						"vpc": true
+					},
+					"depends_on": [
+						"aws_instance.example"
+					]
+				},
+				{
+					"address": "aws_instance.example",
+					"mode": "managed",
+					"type": "aws_instance",
+					"name": "example",
+					"provider_name": "aws",
+					"schema_version": 1,
+					"values": {
+						"ami": "ami-2757f631",
+						"arn": "arn:aws:ec2:us-east-1:244514332448:instance/i-072f8ebcec3192bc9",
+						"associate_public_ip_address": true,
+						"availability_zone": "us-east-1c",
+						"cpu_core_count": 1,
+						"cpu_threads_per_core": 1,
+						"credit_specification": [
+							{
+								"cpu_credits": "standard"
+							}
+						],
+						"disable_api_termination": false,
+						"ebs_block_device": [],
+						"ebs_optimized": false,
+						"ephemeral_block_device": [],
+						"get_password_data": false,
+						"host_id": null,
+						"iam_instance_profile": "",
+						"id": "i-072f8ebcec3192bc9",
+						"instance_initiated_shutdown_behavior": null,
+						"instance_state": "running",
+						"instance_type": "t2.micro",
+						"ipv6_address_count": 0,
+						"ipv6_addresses": [],
+						"key_name": "",
+						"monitoring": false,
+						"network_interface": [],
+						"network_interface_id": null,
+						"password_data": "",
+						"placement_group": "",
+						"primary_network_interface_id": "eni-040ac8eec3d099b5e",
+						"private_dns": "ip-172-31-94-61.ec2.internal",
+						"private_ip": "172.31.94.61",
+						"public_dns": "ec2-52-90-76-38.compute-1.amazonaws.com",
+						"public_ip": "52.90.76.38",
+						"root_block_device": [
+							{
+								"delete_on_termination": true,
+								"encrypted": false,
+								"iops": 100,
+								"kms_key_id": "",
+								"volume_id": "vol-0d5f0b73be219f139",
+								"volume_size": 8,
+								"volume_type": "gp2"
+							}
+						],
+						"security_groups": [
+							"default"
+						],
+						"source_dest_check": true,
+						"subnet_id": "subnet-77f46259",
+						"tags": null,
+						"tenancy": "default",
+						"timeouts": null,
+						"user_data": null,
+						"user_data_base64": null,
+						"volume_tags": {},
+						"vpc_security_group_ids": [
+							"sg-aa287de4"
+						]
+					}
+				}
+			]
+		}
+	}
+}`
+
+const resumeDiffExpected = `{
+	"format_version": "0.1",
+	"terraform_version": "0.12.6",
+	"values": {
+		"root_module": {
+			"resources": [
+				{
+					"address": "aws_eip.ip",
+					"mode": "managed",
+					"type": "aws_eip",
+					"name": "ip",
+					"provider_name": "aws",
+					"schema_version": 0,
+					"values": {
+						... 15 lines omitted
+					},
+					"depends_on": [
+						... 1 lines omitted
+					]
+				},
+				{
+					"address": "aws_instance.example",
+					"mode": "managed",
+					"type": "aws_instance",
+					"name": "example",
+					"provider_name": "aws",
+					"schema_version": 1,
+					"values": {
+						... 50 lines omitted
+					}
+				}
+			]
+		}
+	}
+}`
