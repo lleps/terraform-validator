@@ -40,7 +40,7 @@ func (state *TFState) topLevel() string {
 			sb.WriteString(err.Error() + ">")
 		} else {
 			if parsed.ErrorCount() > 0 {
-				sb.WriteString(fmt.Sprintf("not compliant (%d of %d failing)", parsed.ErrorCount(), parsed.TestCount()))
+				sb.WriteString(fmt.Sprintf("not compliant (%d of %d features failing)", parsed.ErrorCount(), parsed.TestCount()))
 			} else {
 				sb.WriteString(fmt.Sprintf("compliant (%d features passing)", parsed.TestCount()))
 			}
@@ -50,9 +50,41 @@ func (state *TFState) topLevel() string {
 }
 
 func (state *TFState) details() string {
-	// todo: what to show herE?
-	// idk. maybe nothing for now.
-	return "todo: details"
+	sb := strings.Builder{}
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("      Id #%s, %s at %s\n", state.Id, state.Bucket, state.Path))
+	sb.WriteString(fmt.Sprintf("      Last change: %s\n", state.LastUpdate))
+	sb.WriteString("\n")
+	if state.ComplianceResult == "" {
+		sb.WriteString("Compliance check not executed yet.")
+		return sb.String()
+	}
+	sb.WriteString("Features:\n")
+	parsed, err := parseComplianceOutput(state.ComplianceResult)
+	if err != nil {
+		return sb.String() + "<can't parse output: " + err.Error() + ">"
+	}
+
+	for feature, passing := range parsed.featurePassed {
+		if !passing {
+			sb.WriteString(fmt.Sprintf(" - %s FAILED", feature))
+		} else {
+			sb.WriteString(fmt.Sprintf(" - %s OK", feature))
+		}
+		sb.WriteRune('\n')
+	}
+	sb.WriteRune('\n')
+
+	if parsed.ErrorCount() > 0 {
+		sb.WriteString("Errors:\n")
+		for k, errors := range parsed.failMessages {
+			for _, e := range errors {
+				sb.WriteString(fmt.Sprintf(" - %s: %s\n", k, e))
+			}
+		}
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }
 
 // database methods
