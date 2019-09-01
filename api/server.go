@@ -52,7 +52,7 @@ func initDB(prefix string) *database {
 }
 
 func initMonitoring() {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
 			objs, err := db.loadAllTFStates()
@@ -70,8 +70,6 @@ func initMonitoring() {
 
 				if changed {
 					log.Printf("Bucket %s:%s changed state. Registered in log #%s", obj.Bucket, obj.Path, logEntry.Id)
-				} else {
-					log.Printf("Bucket %s:%s skipped (state didn't change),", obj.Bucket, obj.Path)
 				}
 			}
 		}
