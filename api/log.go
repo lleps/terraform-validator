@@ -23,6 +23,9 @@ type ValidationLog struct {
 const (
 	logKindValidation = "validation"
 	logKindTFState    = "tfstate"
+	cliG              = "[32m" // green
+	cliR              = "[31m" // red
+	cliD              = "[0m" // default
 )
 
 // restObject methods
@@ -48,17 +51,19 @@ func (l *ValidationLog) topLevel() string {
 			}
 
 			if parsed.ErrorCount() > 0 {
-				return fmt.Sprintf("FAILING %d/%d", parsed.ErrorCount(), parsed.TestCount())
+				return fmt.Sprintf("%sFAILING %d/%d", cliR, parsed.ErrorCount(), parsed.TestCount())
 			} else {
-				return fmt.Sprintf("FAILING %d/%d", parsed.TestCount(), parsed.TestCount())
+				return fmt.Sprintf("%sOK %d/%d", cliG, parsed.TestCount(), parsed.TestCount())
 			}
 		}
 
 		if l.PrevOutput != "" {
 			sb.WriteString(msgFunc(l.PrevOutput))
+			sb.WriteString(cliD)
 			sb.WriteString(" -> ")
 		}
 		sb.WriteString(msgFunc(l.Output))
+		sb.WriteString(cliD)
 	} else if l.Kind == logKindValidation {
 		parsed, err := parseComplianceOutput(l.Output)
 		if err != nil {
@@ -67,7 +72,7 @@ func (l *ValidationLog) topLevel() string {
 		if parsed.ErrorCount() > 0 {
 			sb.WriteString(fmt.Sprintf("FAILED [%d of %d tests failed]", parsed.ErrorCount(), parsed.TestCount()))
 		} else {
-			sb.WriteString(fmt.Sprintf("PASSED [%d tests passed]", parsed.TestCount()))
+			sb.WriteString(fmt.Sprintf("OK [%d tests passed]", parsed.TestCount()))
 		}
 	} else {
 		sb.WriteString("<invalid kind: " + l.Kind + ">")

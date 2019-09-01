@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -63,6 +65,20 @@ type restObject interface {
 	details() string // what to show in GET /type/{id}
 }
 
+// ByRestObject wraps the type to sort by id
+type ByRestObject []restObject
+
+func (a ByRestObject) Len() int      { return len(a) }
+func (a ByRestObject) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByRestObject) Less(i, j int) bool {
+	id1, err1 := strconv.ParseInt(a[i].id(), 10, 64)
+	id2, err2 := strconv.ParseInt(a[j].id(), 10, 64)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return id1 < id2
+}
+
 // collectionEndpointBuilder contains the parameters to pass to registerCollectionEndpoint
 type collectionEndpointBuilder struct {
 	router       *mux.Router
@@ -83,6 +99,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
+			sort.Sort(ByRestObject(objs))
 			sb := strings.Builder{}
 			for _, o := range objs {
 				sb.WriteString(o.topLevel())
