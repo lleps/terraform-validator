@@ -241,7 +241,12 @@ func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err er
 // or terraform json, run the tfComplianceBin tool against it, and responds
 // the tool output as a response.
 func validateHandler(body string, _ map[string]string) (string, int, error) {
-	planFileBytes, err := base64.StdEncoding.DecodeString(body)
+	var base64data string
+	if err := json.Unmarshal([]byte(body), &base64data); err != nil {
+		return "", 0, fmt.Errorf("can't decode into json string: %v", err)
+	}
+
+	planFileBytes, err := base64.StdEncoding.DecodeString(base64data)
 	if err != nil {
 		return "", 0, err
 	}
