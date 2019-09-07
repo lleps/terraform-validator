@@ -34,6 +34,10 @@ func main() {
 	tfStateRemoveFlag := flag.String("tfstate-remove", "", "Remove the tfstate entry with the given id")
 	tfStateBucket := flag.String("bucket", "", "When -tfstate-add. To specify the bucket to add.")
 	tfStatePath := flag.String("path", "", "When -tfstate-add. To specify the path to add.")
+	// foreignresources
+	frListFlag := flag.Bool("foreignresource-list", false, "List all foreign resources")
+	frGetFlag := flag.String("foreignresource-details", "", "Get the info of the given foreign resource")
+	frRemoveFlag := flag.String("foreignresource-remove", "", "Remove the foreign resource")
 
 	flag.Parse()
 
@@ -82,40 +86,50 @@ func main() {
 				fmt.Printf("Feature '%s' already exists. Pass --replace to overwrite it.\n", featureName)
 				return
 			}
-			body := map[string]string { "name": featureName, "source": string(content) }
+			body := map[string]string{"name": featureName, "source": string(content)}
 			res, code, resErr = execRequest(host, "/features", "POST", body)
 		}
 
 	case *featureRemoveFlag != "":
 		fileWithoutExt := strings.TrimSuffix(*featureRemoveFlag, ".feature")
-		res, code, resErr = execRequest(host, "/features/" + url.QueryEscape(fileWithoutExt), "DELETE", "")
+		res, code, resErr = execRequest(host, "/features/"+url.QueryEscape(fileWithoutExt), "DELETE", "")
 
 	case *featureDetailsFlag != "":
-		res, code, resErr = execRequest(host, "/features/" + url.QueryEscape(*featureDetailsFlag), "GET", "")
+		res, code, resErr = execRequest(host, "/features/"+url.QueryEscape(*featureDetailsFlag), "GET", "")
 
 	// -log-*
 
 	case *logListFlag:
 		res, code, resErr = execRequest(host, "/logs", "GET", "")
 	case *logRemoveFlag != "":
-		res, code, resErr = execRequest(host, "/logs/" + url.QueryEscape(*logRemoveFlag), "DELETE", "")
+		res, code, resErr = execRequest(host, "/logs/"+url.QueryEscape(*logRemoveFlag), "DELETE", "")
 	case *logGetFlag != "":
-		res, code, resErr = execRequest(host, "/logs/" + url.QueryEscape(*logGetFlag), "GET", "")
+		res, code, resErr = execRequest(host, "/logs/"+url.QueryEscape(*logGetFlag), "GET", "")
 
 	// -tfstate-*
+
 	case *tfStateListFlag:
 		res, code, resErr = execRequest(host, "/tfstates", "GET", "")
 	case *tfStateRemoveFlag != "":
-		res, code, resErr = execRequest(host, "/tfstates/" + url.QueryEscape(*tfStateRemoveFlag), "DELETE", "")
+		res, code, resErr = execRequest(host, "/tfstates/"+url.QueryEscape(*tfStateRemoveFlag), "DELETE", "")
 	case *tfStateGetFlag != "":
-		res, code, resErr = execRequest(host, "/tfstates/" + url.QueryEscape(*tfStateGetFlag), "GET", "")
+		res, code, resErr = execRequest(host, "/tfstates/"+url.QueryEscape(*tfStateGetFlag), "GET", "")
 	case *tfStateAddFlag:
 		if *tfStateBucket == "" || *tfStatePath == "" {
 			fmt.Printf("Please specify -bucket and -path when adding a tfstate.\n")
 			return
 		}
-		body := map[string]string { "bucket": *tfStateBucket, "path": *tfStatePath }
+		body := map[string]string{"bucket": *tfStateBucket, "path": *tfStatePath}
 		res, code, resErr = execRequest(host, "/tfstates", "POST", body)
+
+	// -foreignresource-*
+
+	case *frListFlag:
+		res, code, resErr = execRequest(host, "/foreignresources", "GET", "")
+	case *frRemoveFlag != "":
+		res, code, resErr = execRequest(host, "/foreignresources/"+url.QueryEscape(*frRemoveFlag), "DELETE", "")
+	case *frGetFlag != "":
+		res, code, resErr = execRequest(host, "/foreignresources/"+url.QueryEscape(*frGetFlag), "GET", "")
 
 	default:
 		fmt.Println("No option given. Check -h to see options.")

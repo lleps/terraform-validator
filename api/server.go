@@ -222,6 +222,23 @@ func initEndpoints() {
 			})
 		},
 	})
+	registerCollectionEndpoint(db, collectionEndpointBuilder{
+		router:   r,
+		endpoint: "/foreignresources",
+		dbFetchFunc: func(db *database) ([]restObject, error) {
+			objs, err := db.loadAllForeignResources()
+			if err != nil {
+				return nil, nil
+			}
+			result := make([]restObject, len(objs))
+			for i, o := range objs {
+				result[i] = o
+			}
+			return result, nil
+		},
+		dbRemoveFunc: func(db *database, id string) error { return db.removeForeignResource(id) },
+		dbInsertFunc: nil, // POST not supported
+	})
 
 	http.Handle("/", r)
 }
