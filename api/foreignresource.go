@@ -43,6 +43,7 @@ func (r *ForeignResource) details() string {
 	sb.WriteString("\n")
 	sb.WriteString("Resource details:\n")
 	sb.WriteString(r.ResourceDetails)
+	sb.WriteString("\n")
 	return sb.String()
 }
 
@@ -50,7 +51,7 @@ func (r *ForeignResource) details() string {
 
 const foreignResourcesTable = "foreignresources"
 
-var foreignResourcesAttributes = []string{"DiscoveredTimestamp", "ResourceType", "ResourceId", "IsException"}
+var foreignResourcesAttributes = []string{"DiscoveredTimestamp", "ResourceType", "ResourceId", "ResourceDetails", "IsException"}
 
 func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	var result []*ForeignResource

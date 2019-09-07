@@ -176,7 +176,7 @@ func execRequest(
 	reqType string,
 	body interface{},
 ) (result string, code int, err error) {
-	url := host + endpoint
+	fullUrl := host + endpoint
 	marshaled, err := json.Marshal(body)
 	if err != nil {
 		panic(err)
@@ -186,12 +186,12 @@ func execRequest(
 
 	switch reqType {
 	case "POST":
-		resp, err = http.Post(url, "text/plain", strings.NewReader(bodyJson))
+		resp, err = http.Post(fullUrl, "text/plain", strings.NewReader(bodyJson))
 	case "GET":
-		resp, err = http.Get(url)
+		resp, err = http.Get(fullUrl)
 	case "DELETE":
 		client := &http.Client{}
-		req, err := http.NewRequest("DELETE", url, strings.NewReader(bodyJson))
+		req, err := http.NewRequest("DELETE", fullUrl, strings.NewReader(bodyJson))
 		if err == nil {
 			resp, err = client.Do(req)
 		}

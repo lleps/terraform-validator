@@ -18,6 +18,7 @@ var (
 	listenFlag       = flag.String("listen", ":8080", "On which address to listen")
 	dynamoPrefixFlag = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
 	db               *database
+	timestampFormat  = time.Stamp
 )
 
 func main() {
@@ -54,10 +55,17 @@ func initAccountResourcesMonitoring() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for range ticker.C {
-			// Load all tfstates once
-			objs, err := db.loadAllTFStates()
-			if err != nil {
-				log.Printf("Can't load tfstates to monitor for resources outside terraform states: %v", err)
+			// Load all tfstates and current foreign resources.
+			// Quick. tfstates contains maybe a lot of data,
+			// but foreign resources contains only a few fields.
+			tfStates, err1 := db.loadAllTFStates()
+			foreignResources, err2 := db.loadAllForeignResources()
+			if err1 != nil {
+				log.Printf("Can't load tfstates to monitor for resources outside terraform states: %v", err1)
+				continue
+			}
+			if err2 != nil {
+				log.Printf("Can't load foreignresources to monitor for resources outside terraform states: %v", err2)
 				continue
 			}
 
@@ -69,6 +77,9 @@ func initAccountResourcesMonitoring() {
 				log.Printf("Can't init aws session: %v", err)
 				continue
 			}
+
+			// This is the slow part.
+			// Should do some kind of parallelism.
 			resources, err := ListAllResources(sess)
 			if err != nil {
 				log.Printf("Can't list aws resources: %v", err)
@@ -76,17 +87,67 @@ func initAccountResourcesMonitoring() {
 			}
 
 			// Ensure all resources are in at least any tfstate.
-			inAnyTFState := func(id string) bool {
-				for _, tfstate := range objs {
-					if strings.Contains(tfstate.State, id) {
-						return true
+			findForeignResourceEntry := func(resourceId string) *ForeignResource {
+				for _, fr := range foreignResources {
+					if fr.ResourceId == resourceId {
+						return fr
 					}
 				}
-				return false
+				return nil
 			}
+			findResourceInBuckets := func(id string) *TFState {
+				for _, tfstate := range tfStates {
+					if strings.Contains(tfstate.State, id) {
+						return tfstate
+					}
+				}
+				return nil
+			}
+
+			// This is the fast part. Just memory accesses.
+
 			for _, r := range resources {
-				if !inAnyTFState(r.ID()) {
-					log.Printf("WARNING: Resource '%s' not present in any registered tfstate.", r.ID())
+				// For new discovered resources, should check if findResourceInBuckets. If it is,
+				// insert to db and log.
+				existingFr := findForeignResourceEntry(r.ID())
+				resourceBucket := findResourceInBuckets(r.ID())
+				if existingFr == nil {
+					if resourceBucket == nil {
+						id, err := db.nextFreeForeignResourceId()
+						if err != nil {
+							log.Printf("Can't get free fr id: %v", err)
+							continue
+						}
+						fr := &ForeignResource{
+							Id:                  id,
+							DiscoveredTimestamp: time.Now().Format(timestampFormat),
+							ResourceType:        "ec2-instance",
+							ResourceId:          r.ID(),
+							ResourceDetails:     "type: ec2-micro\nami: abcde-123456",
+							IsException:         false,
+						}
+						if err := db.insertOrUpdateForeignResource(fr); err != nil {
+							log.Printf("Can't insert fr: %v", err)
+							continue
+						}
+						// TODO: log entry corresponding to this discovery? or
+						//  bulk log entries with many resources using some kind
+						//  of counter?
+						log.Printf("New foreign resource registered: '%s' #%s", r.ID(), id)
+					}
+				} else {
+					// The resource is not new. Gotta check if the resource is still foreign.
+					// if it isn't, log and delete from DB.
+					if resourceBucket != nil {
+						// not foreign anymore. Delete this.
+						if err := db.removeForeignResource(existingFr.id()); err != nil {
+							log.Printf("Can't delete fr: %v", err)
+							continue
+						}
+						log.Printf("Foreign resource #%s (%s) not foreign anymore! Found in bucket %s:%s. Deleted!",
+							existingFr.id(), existingFr.ResourceId,
+							resourceBucket.Bucket, resourceBucket.Path)
+					}
 				}
 			}
 		}
@@ -273,7 +334,7 @@ func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err er
 	}
 
 	// Register the log entry
-	now := time.Now().Format(time.Stamp)
+	now := time.Now().Format(timestampFormat)
 	logEntry = &ValidationLog{
 		Id:            freeId,
 		Kind:          logKindTFState,
@@ -325,7 +386,7 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 	logEntry := ValidationLog{
 		Id:        id,
 		Kind:      logKindValidation,
-		DateTime:  time.Now().Format(time.Stamp),
+		DateTime:  time.Now().Format(timestampFormat),
 		InputJson: complianceInput,
 		Output:    complianceOutput,
 	}

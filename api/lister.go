@@ -10,11 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
-type Resource interface {
+type AWSResource interface {
 	ID() string
 }
 
-type ResourceLister func(s *session.Session) ([]Resource, error)
+type ResourceLister func(s *session.Session) ([]AWSResource, error)
 
 var resourceListers = make(map[string]ResourceLister)
 
@@ -27,8 +27,8 @@ func register(name string, lister ResourceLister) {
 	resourceListers[name] = lister
 }
 
-func ListAllResources(s *session.Session) ([]Resource, error) {
-	result := make([]Resource, 0)
+func ListAllResources(s *session.Session) ([]AWSResource, error) {
+	result := make([]AWSResource, 0)
 	for resourceType, lister := range resourceListers {
 		list, err := lister(s)
 		if err != nil {
