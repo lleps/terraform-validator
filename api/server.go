@@ -6,22 +6,16 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
 
-const (
-	featuresPath = "./features"
-)
-
 var (
-	listenFlag = flag.String("listen", ":8080", "On which address to listen")
+	listenFlag       = flag.String("listen", ":8080", "On which address to listen")
 	dynamoPrefixFlag = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
-	db *database
+	db               *database
 )
 
 func main() {
@@ -31,7 +25,7 @@ func main() {
 	db = initDB(*dynamoPrefixFlag)
 
 	log.Println("Sync feature files from DB...")
-	if err := syncFeaturesFolderFromDB(); err != nil {
+	if err := syncFeaturesFolderFromDB(db); err != nil {
 		log.Fatalf("Can't sync features from db (features path: '%s'): %v", featuresPath, err)
 	}
 
@@ -80,10 +74,10 @@ func initEndpoints() {
 	r := mux.NewRouter()
 	registerEndpoint(r, "/validate", validateHandler, "POST")
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router: r,
+		router:   r,
 		endpoint: "/features",
 		dbFetchFunc: func(db *database) ([]restObject, error) {
-			objs, err :=  db.loadAllFeatures()
+			objs, err := db.loadAllFeatures()
 			if err != nil {
 				return nil, nil
 			}
@@ -94,7 +88,7 @@ func initEndpoints() {
 			return result, nil
 		},
 		dbRemoveFunc: func(db *database, id string) error {
-			defer func() { _ = syncFeaturesFolderFromDB() }()
+			defer func() { _ = syncFeaturesFolderFromDB(db) }()
 			return db.removeFeature(id)
 		},
 		dbInsertFunc: func(db *database, body string) error {
@@ -113,15 +107,15 @@ func initEndpoints() {
 				return fmt.Errorf("invalid feature name: '%s'", name)
 			}
 
-			defer func() { _ = syncFeaturesFolderFromDB() }()
+			defer func() { _ = syncFeaturesFolderFromDB(db) }()
 			return db.insertOrUpdateFeature(&ComplianceFeature{name, source})
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router: r,
+		router:   r,
 		endpoint: "/logs",
 		dbFetchFunc: func(db *database) ([]restObject, error) {
-			objs, err :=  db.loadAllValidationLogs()
+			objs, err := db.loadAllValidationLogs()
 			if err != nil {
 				return nil, nil
 			}
@@ -135,10 +129,10 @@ func initEndpoints() {
 		dbInsertFunc: nil, // POST not supported
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router: r,
+		router:   r,
 		endpoint: "/tfstates",
 		dbFetchFunc: func(db *database) ([]restObject, error) {
-			objs, err :=  db.loadAllTFStates()
+			objs, err := db.loadAllTFStates()
 			if err != nil {
 				return nil, nil
 			}
@@ -172,9 +166,9 @@ func initEndpoints() {
 			}
 
 			return db.insertOrUpdateTFState(&TFState{
-				Id: id,
+				Id:     id,
 				Bucket: bucket,
-				Path: path,
+				Path:   path,
 			})
 		},
 	})
@@ -274,36 +268,6 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 	}
 
 	return complianceOutput, http.StatusOK, nil
-}
-
-// syncFeaturesFolderFromDB writes all the feature files that terraform-compliance requires.
-func syncFeaturesFolderFromDB() error {
-	// Empty the folder
-	if err := os.RemoveAll(featuresPath); err != nil {
-		if os.IsNotExist(err) {
-			// ok. Not created yet
-		} else {
-			// somewhat with permissions maybe
-			return err
-		}
-	}
-	if err := os.MkdirAll(featuresPath, os.ModePerm); err != nil {
-		return err
-	}
-
-	// Write all feature files
-	features, err := db.loadAllFeatures()
-	if err != nil {
-		return err
-	}
-	for _, f := range features {
-		filePath := featuresPath + "/" + f.Id + ".feature"
-		if err := ioutil.WriteFile(filePath, []byte(f.FeatureSource), os.ModePerm); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // validateFeatureName returns true if the given feature name is valid (doesn't contains invalid file characters).
