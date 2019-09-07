@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -30,7 +32,8 @@ func main() {
 	}
 
 	log.Printf("Init state monitoring...")
-	initMonitoring()
+	initStateChangeMonitoring()
+	initAccountResourcesMonitoring()
 
 	log.Printf("Listening on '%s'...", *listenFlag)
 	initEndpoints()
@@ -45,7 +48,54 @@ func initDB(prefix string) *database {
 	return result
 }
 
-func initMonitoring() {
+// initAccountResourcesMonitoring starts a goroutine that periodically checks if there are
+// resources in the account that don't belong to any registered tfstate, and reports them.
+func initAccountResourcesMonitoring() {
+	ticker := time.NewTicker(10 * time.Second)
+	go func() {
+		for range ticker.C {
+			// Load all tfstates once
+			objs, err := db.loadAllTFStates()
+			if err != nil {
+				log.Printf("Can't load tfstates to monitor for resources outside terraform states: %v", err)
+				continue
+			}
+
+			// Discover all account resources
+			sess, err := session.NewSession(&aws.Config{
+				Region: aws.String("us-east-1")},
+			)
+			if err != nil {
+				log.Printf("Can't init aws session: %v", err)
+				continue
+			}
+			resources, err := ListAllResources(sess)
+			if err != nil {
+				log.Printf("Can't list aws resources: %v", err)
+				continue
+			}
+
+			// Ensure all resources are in at least any tfstate.
+			inAnyTFState := func(id string) bool {
+				for _, tfstate := range objs {
+					if strings.Contains(tfstate.State, id) {
+						return true
+					}
+				}
+				return false
+			}
+			for _, r := range resources {
+				if !inAnyTFState(r.ID()) {
+					log.Printf("WARNING: Resource '%s' not present in any registered tfstate.", r.ID())
+				}
+			}
+		}
+	}()
+}
+
+// initStateChangeMonitoring starts a goroutine that periodically checks if
+// tfstates changed, and if they did runs the compliance tool and logs results.
+func initStateChangeMonitoring() {
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
