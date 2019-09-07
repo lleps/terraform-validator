@@ -42,7 +42,7 @@ func main() {
 
 func initDB(prefix string) *database {
 	result := newDynamoDB(prefix)
-	if err := result.initTables(complianceFeatureTable, validationLogTable, tfStateTable); err != nil {
+	if err := result.initTables(complianceFeatureTable, validationLogTable, tfStateTable, foreignResourcesTable); err != nil {
 		log.Fatalf("Can't make database table: %v", err)
 	}
 	return result

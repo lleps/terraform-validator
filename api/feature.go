@@ -28,10 +28,11 @@ func (f *ComplianceFeature) details() string {
 // Database methods
 
 const complianceFeatureTable = "features"
+
 var complianceFeatureAttributes = []string{"FeatureSource"}
 
 func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
-	var features []*ComplianceFeature
+	var result []*ComplianceFeature
 	err := db.loadAllGeneric(
 		db.tableFor(complianceFeatureTable),
 		complianceFeatureAttributes,
@@ -39,12 +40,12 @@ func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 			var elem ComplianceFeature
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
 			if err == nil {
-				features = append(features, &elem)
+				result = append(result, &elem)
 			}
 			return err
 		})
 
-	return features, err
+	return result, err
 }
 
 func (db *database) insertOrUpdateFeature(feature *ComplianceFeature) error {

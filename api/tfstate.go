@@ -89,11 +89,12 @@ func (state *TFState) details() string {
 
 // database methods
 
-const tfStateTable= "tfstates"
+const tfStateTable = "tfstates"
+
 var tfStateAttributes = []string{"Bucket", "Path", "State", "ComplianceResult", "LastUpdate"}
 
 func (db *database) loadAllTFStates() ([]*TFState, error) {
-	var tfStates []*TFState
+	var result []*TFState
 	err := db.loadAllGeneric(
 		db.tableFor(tfStateTable),
 		tfStateAttributes,
@@ -101,12 +102,12 @@ func (db *database) loadAllTFStates() ([]*TFState, error) {
 			var elem TFState
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
 			if err == nil {
-				tfStates = append(tfStates, &elem)
+				result = append(result, &elem)
 			}
 			return err
 		})
 
-	return tfStates, err
+	return result, err
 }
 
 func (db *database) insertOrUpdateTFState(tfState *TFState) error {

@@ -97,10 +97,11 @@ func (l *ValidationLog) details() string {
 // database methods
 
 const validationLogTable = "logs"
-var validationLogAttributes = []string{"Kind", "DateTime", "InputJson","Output", "Details", "PrevInputJson", "PrevOutput"}
+
+var validationLogAttributes = []string{"Kind", "DateTime", "InputJson", "Output", "Details", "PrevInputJson", "PrevOutput"}
 
 func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
-	var validationLogs []*ValidationLog
+	var result []*ValidationLog
 	err := db.loadAllGeneric(
 		db.tableFor(validationLogTable),
 		validationLogAttributes,
@@ -108,12 +109,12 @@ func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
 			var elem ValidationLog
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
 			if err == nil {
-				validationLogs = append(validationLogs, &elem)
+				result = append(result, &elem)
 			}
 			return err
 		})
 
-	return validationLogs, err
+	return result, err
 }
 
 func (db *database) insertOrUpdateValidationLog(validationLog *ValidationLog) error {
