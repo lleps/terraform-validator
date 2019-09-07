@@ -14,6 +14,20 @@ import (
 	"strings"
 )
 
+func disableCors(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Content-Length, Accept-Encoding")
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Max-Age", "86400")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
 // registerEndpoint registers in the router an HTTP request with
 // proper error handling and logging.
 func registerEndpoint(
@@ -60,9 +74,9 @@ func registerEndpoint(
 
 // restObject groups the info required for all DB objects by the REST API.
 type restObject interface {
-	id() string // the obj id. To be matched in in GET,DELETE /type/{id)
+	id() string       // the obj id. To be matched in in GET,DELETE /type/{id)
 	topLevel() string // what to show in GET /type
-	details() string // what to show in GET /type/{id}
+	details() string  // what to show in GET /type/{id}
 }
 
 // ByRestObject wraps the type to sort by id
@@ -121,7 +135,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
 		registerEndpoint(builder.router, builder.endpoint, allHandler, "GET")
-		registerEndpoint(builder.router, builder.endpoint + "/{id}", detailsHandler, "GET")
+		registerEndpoint(builder.router, builder.endpoint+"/{id}", detailsHandler, "GET")
 	}
 
 	// GET /endpoint/{id}
@@ -163,7 +177,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
-		registerEndpoint(builder.router, builder.endpoint + "/{id}", handler, "DELETE")
+		registerEndpoint(builder.router, builder.endpoint+"/{id}", handler, "DELETE")
 	}
 
 	// POST /endpoint
@@ -177,4 +191,3 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 		registerEndpoint(builder.router, builder.endpoint, handler, "POST")
 	}
 }
-

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+
 	"log"
 	"net/http"
 	"strings"
@@ -37,8 +39,11 @@ func main() {
 	initAccountResourcesMonitoring()
 
 	log.Printf("Listening on '%s'...", *listenFlag)
-	initEndpoints()
-	log.Fatal(http.ListenAndServe(*listenFlag, nil))
+	router := initEndpoints()
+
+	corsObj := handlers.AllowedOrigins([]string{"*"})
+
+	log.Fatal(http.ListenAndServe(*listenFlag, handlers.CORS(corsObj)(router)))
 }
 
 func initDB(prefix string) *database {
@@ -181,7 +186,7 @@ func initStateChangeMonitoring() {
 	}()
 }
 
-func initEndpoints() {
+func initEndpoints() *mux.Router {
 	r := mux.NewRouter()
 	registerEndpoint(r, "/validate", validateHandler, "POST")
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
@@ -302,6 +307,7 @@ func initEndpoints() {
 	})
 
 	http.Handle("/", r)
+	return r
 }
 
 // checkTFState checks if the given tfstate changed in S3.
