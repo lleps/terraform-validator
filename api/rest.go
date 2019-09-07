@@ -14,20 +14,6 @@ import (
 	"strings"
 )
 
-func disableCors(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Content-Length, Accept-Encoding")
-		if r.Method == "OPTIONS" {
-			w.Header().Set("Access-Control-Max-Age", "86400")
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
-}
-
 // registerEndpoint registers in the router an HTTP request with
 // proper error handling and logging.
 func registerEndpoint(
@@ -39,8 +25,10 @@ func registerEndpoint(
 	router.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		log.Println()
-		log.Printf("%s %s [from %s]", r.Method, r.URL, r.RemoteAddr)
+		code := http.StatusInternalServerError
+		defer func() {
+			log.Printf("%s %s [from %s]: HTTP %d", r.Method, r.URL, r.RemoteAddr, code)
+		}()
 
 		// parse body and vars
 		vars := mux.Vars(r)
@@ -66,9 +54,6 @@ func registerEndpoint(
 		if err != nil {
 			log.Println("Can't write response:", err)
 		}
-
-		// log request and response code
-		log.Printf("HTTP Response: %d", code)
 	}).Methods(method)
 }
 
