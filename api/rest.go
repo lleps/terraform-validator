@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -121,25 +122,51 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			}
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
-		registerEndpoint(builder.router, builder.endpoint, allHandler, "GET")
-		registerEndpoint(builder.router, builder.endpoint+"/{id}", detailsHandler, "GET")
-	}
-
-	// GET /endpoint/{id}
-	if builder.dbFetchFunc != nil {
-		handler := func(body string, _ map[string]string) (string, int, error) {
+		allHandlerJSON := func(body string, _ map[string]string) (string, int, error) {
 			objs, err := builder.dbFetchFunc(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
-			sb := strings.Builder{}
+			sort.Sort(ByRestObject(objs))
+			result := make([]interface{}, 0)
 			for _, o := range objs {
-				sb.WriteString(o.topLevel())
-				sb.WriteRune('\n')
+				dst := make(map[string]interface{})
+				dst["id"] = o.id()
+				o.writeTopLevelFields(dst)
+				result = append(result, dst)
 			}
-			return sb.String(), http.StatusOK, nil
+			asJSON, err := json.Marshal(result)
+			if err != nil {
+				return "", 0, err
+			}
+
+			return string(asJSON), http.StatusOK, nil
 		}
-		registerEndpoint(builder.router, builder.endpoint, handler, "GET")
+		detailsHandlerJSON := func(body string, urlVars map[string]string) (string, int, error) {
+			id := urlVars["id"]
+			objs, err := builder.dbFetchFunc(db)
+			if err != nil {
+				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
+			}
+			for _, elem := range objs {
+				if elem.id() == id {
+					dst := make(map[string]interface{})
+					dst["id"] = elem.id()
+					elem.writeDetailedFields(dst)
+					asJSON, err := json.Marshal(dst)
+					if err != nil {
+						return "", 0, err
+					}
+
+					return string(asJSON), http.StatusOK, nil
+				}
+			}
+			return "can't find object: " + id, http.StatusNotFound, nil
+		}
+		registerEndpoint(builder.router, builder.endpoint+"/json", allHandlerJSON, "GET")
+		registerEndpoint(builder.router, builder.endpoint+"/json/{id}", detailsHandlerJSON, "GET")
+		registerEndpoint(builder.router, builder.endpoint, allHandler, "GET")
+		registerEndpoint(builder.router, builder.endpoint+"/{id}", detailsHandler, "GET")
 	}
 
 	// DELETE /endpoint/{id}

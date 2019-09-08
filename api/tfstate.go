@@ -92,10 +92,10 @@ func (state *TFState) writeTopLevelFields(dst map[string]interface{}) {
 	dst["bucket"] = state.Bucket
 	dst["last_update"] = state.LastUpdate
 	if state.ComplianceResult == "" {
-		dst["compliance_passed"] = false
+		dst["compliance_present"] = false
 		return
 	}
-	dst["compliance_passed"] = true
+	dst["compliance_present"] = true
 	parsed, _ := parseComplianceOutput(state.ComplianceResult)
 	dst["compliance_errors"] = parsed.ErrorCount()
 	dst["compliance_tests"] = parsed.TestCount()
