@@ -47,6 +47,14 @@ func (r *ForeignResource) details() string {
 	return sb.String()
 }
 
+func (r *ForeignResource) writeTopLevelFields(dst map[string]interface{}) {
+
+}
+
+func (r *ForeignResource) writeDetailedFields(dst map[string]interface{}) {
+
+}
+
 // database methods
 
 const foreignResourcesTable = "foreignresources"

@@ -59,9 +59,11 @@ func registerEndpoint(
 
 // restObject groups the info required for all DB objects by the REST API.
 type restObject interface {
-	id() string       // the obj id. To be matched in in GET,DELETE /type/{id)
-	topLevel() string // what to show in GET /type
-	details() string  // what to show in GET /type/{id}
+	id() string                                     // the obj id. To be matched in in GET,DELETE /type/{id)
+	topLevel() string                               // for CLI. what to show in GET /type
+	details() string                                // for CLI. what to show in GET /type/{id}
+	writeTopLevelFields(dst map[string]interface{}) // for json responses.  GET /type/json.
+	writeDetailedFields(dst map[string]interface{}) // for json responses.  GET /type/json/{id}.
 }
 
 // ByRestObject wraps the type to sort by id

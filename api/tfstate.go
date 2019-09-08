@@ -87,6 +87,30 @@ func (state *TFState) details() string {
 	return sb.String()
 }
 
+func (state *TFState) writeTopLevelFields(dst map[string]interface{}) {
+	dst["path"] = state.Path
+	dst["bucket"] = state.Bucket
+	dst["last_update"] = state.LastUpdate
+	if state.ComplianceResult == "" {
+		dst["compliance_passed"] = false
+		return
+	}
+	dst["compliance_passed"] = true
+	parsed, _ := parseComplianceOutput(state.ComplianceResult)
+	dst["compliance_errors"] = parsed.ErrorCount()
+	dst["compliance_tests"] = parsed.TestCount()
+}
+
+func (state *TFState) writeDetailedFields(dst map[string]interface{}) {
+	state.writeTopLevelFields(dst)
+	dst["state"] = state.State
+	if _, exists := dst["compliance_present"]; exists {
+		parsed, _ := parseComplianceOutput(state.ComplianceResult)
+		dst["compliance_features_passed"] = parsed.featurePassed
+		dst["compliance_fail_messages"] = parsed.failMessages
+	}
+}
+
 // database methods
 
 const tfStateTable = "tfstates"

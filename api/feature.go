@@ -25,6 +25,14 @@ func (f *ComplianceFeature) details() string {
 	return f.FeatureSource
 }
 
+func (f *ComplianceFeature) writeTopLevelFields(dst map[string]interface{}) {
+
+}
+
+func (f *ComplianceFeature) writeDetailedFields(dst map[string]interface{}) {
+
+}
+
 // Database methods
 
 const complianceFeatureTable = "features"

@@ -94,6 +94,14 @@ func (l *ValidationLog) details() string {
 	return sb.String()
 }
 
+func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
+
+}
+
+func (l *ValidationLog) writeDetailedFields(dst map[string]interface{}) {
+
+}
+
 // database methods
 
 const validationLogTable = "logs"
