@@ -10,6 +10,7 @@ import TableRow from '@material-ui/core/TableRow';
 import Paper from '@material-ui/core/Paper';
 import Title from './Title';
 import Typography from '@material-ui/core/Typography';
+import { BrowserRouter as Router, Route, Link } from "react-router-dom";
 
 const axios = require('axios');
 
@@ -154,15 +155,69 @@ const useStyles = makeStyles(theme => ({
   },
 }));
 
-function App() {
+function Features() {
   const classes = useStyles();
 
   return (
+      <Paper className={classes.paper}>
+        <b>Feature list!</b>
+      </Paper>
+  )
+}
+
+function Logs() {
+  const classes = useStyles();
+
+  return (
+      <Paper className={classes.paper}>
+        <b>Log list!</b>
+      </Paper>
+  )
+}
+
+function ForeignResources() {
+  const classes = useStyles();
+
+  return (
+      <Paper className={classes.paper}>
+        <b>Log list!</b>
+      </Paper>
+  )
+}
+
+function TFStates() {
+  const classes = useStyles();
+
+  return (
+      <Paper className={classes.paper}>
+        <TFStateList/>
+      </Paper>
+  )
+}
+
+function App() {
+  return (
     <div className="App">
       <header className="App-header">
-        <Paper className={classes.paper}>
-          <TFStateList/>
-        </Paper>
+        <Router>
+          <nav>
+            <ul>
+              <li>
+                <Link to="/">Logs</Link>
+              </li>
+              <li>
+                <Link to="/tfstates/">Registered states</Link>
+              </li>
+              <li>
+                <Link to="/features/">Features</Link>
+              </li>
+            </ul>
+          </nav>
+          <Route path="/" exact component={Logs} />
+          <Route path="/tfstates/" component={TFStates} />
+          <Route path="/features/" component={Features} />
+          <Route path="/foreignresources/" component={ForeignResources} />
+        </Router>
       </header>
     </div>
   );
