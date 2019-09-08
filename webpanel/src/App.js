@@ -1,78 +1,19 @@
 import React from 'react';
 import './App.css';
-import { makeStyles } from '@material-ui/core/styles';
-import { Button } from '@material-ui/core';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableHead from '@material-ui/core/TableHead';
-import TableRow from '@material-ui/core/TableRow';
 import Paper from '@material-ui/core/Paper';
-import Title from './Title';
-import Typography from '@material-ui/core/Typography';
 import { BrowserRouter as Router, Route, Link } from "react-router-dom";
-
-const axios = require('axios');
-
-function ComplianceText(data) {
-  if (data.compliance_present === true) {
-    if (data.compliance_errors === 0) {
-      return <Typography color="primary">yes ({data.compliance_tests} passing)</Typography>
-    } else {
-      return <Typography color="secondary">no ({data.compliance_errors}/{data.compliance_tests} failing)</Typography>
-    }
-  } else {
-    return <Typography>unchecked</Typography>
-  }
-}
-
-class TFStateList extends React.Component {
-  state = {
-    tfstates: []
-  };
-
-  componentDidMount() {
-    axios.get(`http://localhost:8080/tfstates/json`)
-      .then(res => {
-        const tfstates = res.data;
-        this.setState({ tfstates });
-      })
-  }
-
-  render() {
-    return (
-      <React.Fragment>
-      <Title>Latest state changes</Title>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Bucket</TableCell>
-            <TableCell>Path</TableCell>
-            <TableCell>Last Update</TableCell>
-            <TableCell>Compliant</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-        { this.state.tfstates
-          .map(l => (
-            <TableRow key={l.id}>
-              <TableCell>{l.bucket}</TableCell>
-              <TableCell>{l.path}</TableCell>
-              <TableCell>{l.last_update}</TableCell>
-              <TableCell>{ComplianceText(l)}</TableCell>
-              <TableCell align="right">
-                <Button>Details</Button>
-                <Button>Delete</Button>
-              </TableCell>
-          </TableRow>
-        ))}
-        </TableBody>
-      </Table>
-      </React.Fragment>
-    )
-  }
-}
+import {TFStatesTable} from "./TFStates";
+import List from "@material-ui/core/List";
+import ListItem from "@material-ui/core/ListItem";
+import ListItemText from "@material-ui/core/ListItemText";
+import CssBaseline from "@material-ui/core/CssBaseline";
+import AppBar from "@material-ui/core/AppBar";
+import Drawer from '@material-ui/core/Drawer';
+import Hidden from '@material-ui/core/Hidden';
+import IconButton from '@material-ui/core/IconButton';
+import Toolbar from '@material-ui/core/Toolbar';
+import Typography from '@material-ui/core/Typography';
+import { makeStyles, useTheme } from '@material-ui/core/styles';
 
 const drawerWidth = 240;
 
@@ -80,69 +21,31 @@ const useStyles = makeStyles(theme => ({
   root: {
     display: 'flex',
   },
-  toolbar: {
-    paddingRight: 24, // keep right padding when drawer closed
-  },
-  toolbarIcon: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    padding: '0 8px',
-    ...theme.mixins.toolbar,
-  },
-  appBar: {
-    zIndex: theme.zIndex.drawer + 1,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.leavingScreen,
-    }),
-  },
-  appBarShift: {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  },
-  menuButton: {
-    marginRight: 36,
-  },
-  menuButtonHidden: {
-    display: 'none',
-  },
-  title: {
-    flexGrow: 1,
-  },
-  drawerPaper: {
-    position: 'relative',
-    whiteSpace: 'nowrap',
-    width: drawerWidth,
-    transition: theme.transitions.create('width', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  },
-  drawerPaperClose: {
-    overflowX: 'hidden',
-    transition: theme.transitions.create('width', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.leavingScreen,
-    }),
-    width: theme.spacing(7),
+  drawer: {
     [theme.breakpoints.up('sm')]: {
-      width: theme.spacing(9),
+      width: drawerWidth,
+      flexShrink: 0,
     },
   },
-  appBarSpacer: theme.mixins.toolbar,
+  appBar: {
+    marginLeft: drawerWidth,
+    [theme.breakpoints.up('sm')]: {
+      width: `calc(100% - ${drawerWidth}px)`,
+    },
+  },
+  menuButton: {
+    marginRight: theme.spacing(2),
+    [theme.breakpoints.up('sm')]: {
+      display: 'none',
+    },
+  },
+  toolbar: theme.mixins.toolbar,
+  drawerPaper: {
+    width: drawerWidth,
+  },
   content: {
     flexGrow: 1,
-    height: '100vh',
-    overflow: 'auto',
-  },
-  container: {
-    paddingTop: theme.spacing(4),
-    paddingBottom: theme.spacing(4),
+    padding: theme.spacing(3),
   },
   paper: {
     padding: theme.spacing(2),
@@ -150,10 +53,105 @@ const useStyles = makeStyles(theme => ({
     overflow: 'auto',
     flexDirection: 'column',
   },
-  fixedHeight: {
-    height: 240,
-  },
 }));
+
+function ResponsiveDrawer(props) {
+  const { container } = props;
+  const classes = useStyles();
+  const theme = useTheme();
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  function handleDrawerToggle() {
+    setMobileOpen(!mobileOpen);
+  }
+
+  const drawer = (
+      <div>
+        <div className={classes.toolbar} />
+        <List>
+          <Link to="/">
+            <ListItem button key="Logs">
+              <ListItemText primary="Logs" />
+            </ListItem>
+          </Link>
+          <Link to="/features">
+            <ListItem button key="Features">
+              <ListItemText primary="Features" />
+            </ListItem>
+          </Link>
+          <Link to="/tfstates">
+            <ListItem button key="Terraform States">
+              <ListItemText primary="Terraform States" />
+            </ListItem>
+          </Link>
+          <Link to="/foreignresources">
+            <ListItem button key="Foreign Resources">
+              <ListItemText primary="Foreign Resources" />
+            </ListItem>
+          </Link>
+        </List>
+      </div>
+  );
+
+  return (
+      <div className={classes.root}>
+        <CssBaseline />
+        <AppBar position="fixed" className={classes.appBar}>
+          <Toolbar>
+            <IconButton
+                color="inherit"
+                aria-label="open drawer"
+                edge="start"
+                onClick={handleDrawerToggle}
+                className={classes.menuButton}
+            >
+            </IconButton>
+            <Typography variant="h6" noWrap>
+              Terraform Monitor for AWS
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        <nav className={classes.drawer} aria-label="mailbox folders">
+          {/* The implementation can be swapped with js to avoid SEO duplication of links. */}
+          <Hidden smUp implementation="css">
+            <Drawer
+                container={container}
+                variant="temporary"
+                anchor={theme.direction === 'rtl' ? 'right' : 'left'}
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                classes={{
+                  paper: classes.drawerPaper,
+                }}
+                ModalProps={{
+                  keepMounted: true, // Better open performance on mobile.
+                }}
+            >
+              {drawer}
+            </Drawer>
+          </Hidden>
+          <Hidden xsDown implementation="css">
+            <Drawer
+                classes={{
+                  paper: classes.drawerPaper,
+                }}
+                variant="permanent"
+                open
+            >
+              {drawer}
+            </Drawer>
+          </Hidden>
+        </nav>
+        <main className={classes.content}>
+          <div className={classes.toolbar} />
+            <Route path="/" exact component={Logs} />
+            <Route path="/tfstates/" component={TFStates} />
+            <Route path="/features/" component={Features} />
+            <Route path="/foreignresources/" component={ForeignResources} />
+        </main>
+      </div>
+  );
+}
 
 function Features() {
   const classes = useStyles();
@@ -190,7 +188,7 @@ function TFStates() {
 
   return (
       <Paper className={classes.paper}>
-        <TFStateList/>
+        <TFStatesTable/>
       </Paper>
   )
 }
@@ -200,23 +198,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <Router>
-          <nav>
-            <ul>
-              <li>
-                <Link to="/">Logs</Link>
-              </li>
-              <li>
-                <Link to="/tfstates/">Registered states</Link>
-              </li>
-              <li>
-                <Link to="/features/">Features</Link>
-              </li>
-            </ul>
-          </nav>
-          <Route path="/" exact component={Logs} />
-          <Route path="/tfstates/" component={TFStates} />
-          <Route path="/features/" component={Features} />
-          <Route path="/foreignresources/" component={ForeignResources} />
+          <ResponsiveDrawer/>
         </Router>
       </header>
     </div>
