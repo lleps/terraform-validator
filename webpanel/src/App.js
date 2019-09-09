@@ -3,6 +3,7 @@ import './App.css';
 import Paper from '@material-ui/core/Paper';
 import { BrowserRouter as Router, Route, Link } from "react-router-dom";
 import {TFStatesTable} from "./TFStates";
+import {FeaturesTable} from "./Features";
 import List from "@material-ui/core/List";
 import ListItem from "@material-ui/core/ListItem";
 import ListItemText from "@material-ui/core/ListItemText";
@@ -14,6 +15,7 @@ import IconButton from '@material-ui/core/IconButton';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
+import {StateLogsTable, ValidationLogsTable} from "./Logs";
 
 const drawerWidth = 240;
 
@@ -158,7 +160,7 @@ function Features() {
 
   return (
       <Paper className={classes.paper}>
-        <b>Feature list!</b>
+        <FeaturesTable/>
       </Paper>
   )
 }
@@ -167,9 +169,14 @@ function Logs() {
   const classes = useStyles();
 
   return (
-      <Paper className={classes.paper}>
-        <b>Log list!</b>
-      </Paper>
+      <div>
+          <Paper className={classes.paper}>
+              <ValidationLogsTable/>
+          </Paper>
+          <Paper className={classes.paper}>
+              <StateLogsTable/>
+          </Paper>
+      </div>
   )
 }
 

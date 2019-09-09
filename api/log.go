@@ -95,7 +95,17 @@ func (l *ValidationLog) details() string {
 }
 
 func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
-
+	dst["kind"] = l.Kind
+	dst["date_time"] = l.DateTime
+	dst["details"] = l.Details
+	parsed, _ := parseComplianceOutput(l.Output)
+	dst["compliance_errors"] = parsed.ErrorCount()
+	dst["compliance_tests"] = parsed.TestCount()
+	if l.Kind == "tfstate" {
+		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
+		dst["lines_added"] = len(added)
+		dst["lines_removed"] = len(removed)
+	}
 }
 
 func (l *ValidationLog) writeDetailedFields(dst map[string]interface{}) {
