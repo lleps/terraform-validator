@@ -78,7 +78,7 @@ func (a ByRestObject) Less(i, j int) bool {
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	return id1 < id2
+	return id2 < id1
 }
 
 // collectionEndpointBuilder contains the parameters to pass to registerCollectionEndpoint

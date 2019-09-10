@@ -8,14 +8,15 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import {TrendingFlat} from "@material-ui/icons";
 
 const axios = require('axios');
 
 function ValidationText(errors, tests) {
     if (errors === 0) {
-        return <Typography color="primary" component="body1">{tests}/{tests} tests</Typography>
+        return <Typography color="primary" component="body1">{tests}/{tests}</Typography>
     } else {
-        return <Typography color="secondary" component="body1">{tests-errors}/{tests} tests</Typography>
+        return <Typography color="secondary" component="body1">{tests-errors}/{tests}</Typography>
     }
 }
 
@@ -28,7 +29,7 @@ function ValidationState(data) {
         return (
             <div>
                 {ValidationText(prevErrors, prevTests)}
-                ->
+                <TrendingFlat/>
                 {ValidationText(data.compliance_errors, data.compliance_tests)}
             </div>
         )
@@ -38,7 +39,12 @@ function ValidationState(data) {
 function Lines(data) {
     const added = data.lines_added;
     const removed = data.lines_removed;
-    if (added > 0 && removed === 0) { // +x;
+    if (data.compliance_tests_prev === 0) {
+        return <div>new</div>
+    }
+
+
+    /*if (added > 0 && removed === 0) { // +x;
         return (
             <div>
                 <Typography component="body1">+{added};</Typography>
@@ -57,7 +63,8 @@ function Lines(data) {
                 <Typography component="body1">-{removed};</Typography>
             </div>
         )
-    }
+    }*/
+    return <div>change</div>
 }
 
 export class ValidationLogsTable extends React.Component {
@@ -135,8 +142,8 @@ export class StateLogsTable extends React.Component {
                         <TableRow>
                             <TableCell>Date</TableCell>
                             <TableCell>Bucket:Path</TableCell>
-                            <TableCell>Lines Changed</TableCell>
-                            <TableCell>Compliance Change</TableCell>
+                            <TableCell>Type</TableCell>
+                            <TableCell align="right">Compliance</TableCell>
                             <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
