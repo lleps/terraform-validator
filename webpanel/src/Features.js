@@ -7,6 +7,7 @@ import TableRow from "@material-ui/core/TableRow";
 import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 const axios = require('axios');
 
@@ -32,6 +33,10 @@ export class FeaturesTable extends React.Component {
     }
 
     render() {
+        if (this.state.features.length === 0) {
+            return <div align="center"><CircularProgress/></div>
+        }
+
         return (
             <React.Fragment>
                 <Title>Features</Title>
@@ -40,7 +45,7 @@ export class FeaturesTable extends React.Component {
                         <TableRow>
                             <TableCell>Name</TableCell>
                             <TableCell>State</TableCell>
-                            <TableCell>Actions</TableCell>
+                            <TableCell align="right">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>

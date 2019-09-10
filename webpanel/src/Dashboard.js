@@ -18,9 +18,13 @@ import MenuIcon from '@material-ui/icons/Menu';
 import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
 import NotificationsIcon from '@material-ui/icons/Notifications';
 import { mainListItems, secondaryListItems } from './listItems';
+import { BrowserRouter as Router, Route } from "react-router-dom";
 import Chart from './Chart';
 import Deposits from './Deposits';
 import Orders from './Orders';
+import {TFStatesTable} from "./TFStates";
+import {StateLogsTable, ValidationLogsTable} from "./Logs";
+import {FeaturesTable} from "./Features";
 
 function Copyright() {
   return (
@@ -32,6 +36,73 @@ function Copyright() {
       {new Date().getFullYear()}
       {'.'}
     </Typography>
+  );
+}
+
+function Logs() {
+  const classes = useStyles();
+
+  return (
+      <div>
+      <Grid item xs={12}>
+        <Paper className={classes.paper}>
+          <StateLogsTable/>
+        </Paper>
+      </Grid>
+      <Grid item xs={12}>
+        <Paper className={classes.paper}>
+          <ValidationLogsTable/>
+        </Paper>
+      </Grid>
+      </div>
+  );
+}
+
+function Features() {
+  const classes = useStyles();
+
+  return (
+      <Grid item xs={12}>
+        <Paper className={classes.paper}>
+          <FeaturesTable/>
+        </Paper>
+      </Grid>
+  );
+}
+
+function TFStates() {
+  const classes = useStyles();
+
+  return (
+      <Grid item xs={12}>
+        <Paper className={classes.paper}>
+          <TFStatesTable/>
+        </Paper>
+      </Grid>
+  );
+}
+
+function ForeignResources() {
+  const classes = useStyles();
+
+  return (
+      <Grid item xs={12}>
+        <Paper className={classes.paper}>
+          Foreign Resources Unsupported..
+        </Paper>
+      </Grid>
+  );
+}
+
+// Draws content based on route
+function Content() {
+  return (
+      <Grid container spacing={3}>
+        <Route path="/" exact component={Logs} />
+        <Route path="/features" component={Features} />
+        <Route path="/tfstates" component={TFStates} />
+        <Route path="/foreignresources" component={ForeignResources} />
+      </Grid>
   );
 }
 
@@ -171,28 +242,8 @@ export default function Dashboard() {
       <main className={classes.content}>
         <div className={classes.appBarSpacer} />
         <Container maxWidth="lg" className={classes.container}>
-          <Grid container spacing={3}>
-            {/* Chart */}
-            <Grid item xs={12} md={8} lg={9}>
-              <Paper className={fixedHeightPaper}>
-                <Chart />
-              </Paper>
-            </Grid>
-            {/* Recent Deposits */}
-            <Grid item xs={12} md={4} lg={3}>
-              <Paper className={fixedHeightPaper}>
-                <Deposits />
-              </Paper>
-            </Grid>
-            {/* Recent Orders */}
-            <Grid item xs={12}>
-              <Paper className={classes.paper}>
-                <Orders />
-              </Paper>
-            </Grid>
-          </Grid>
+            <Content/>
         </Container>
-        <Copyright />
       </main>
     </div>
   );

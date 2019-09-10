@@ -16,6 +16,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
 import {StateLogsTable, ValidationLogsTable} from "./Logs";
+import Dashboard from "./Dashboard";
 
 const drawerWidth = 240;
 
@@ -201,7 +202,7 @@ function TFStates() {
 }
 
 function App() {
-  return (
+  /*return (
     <div className="App">
       <header className="App-header">
         <Router>
@@ -210,6 +211,10 @@ function App() {
       </header>
     </div>
   );
+   */
+  return <Router>
+      <Dashboard/>
+  </Router>
 }
 
 export default App;
