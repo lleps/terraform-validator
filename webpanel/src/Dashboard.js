@@ -25,6 +25,7 @@ import Orders from './Orders';
 import {TFStatesTable} from "./TFStates";
 import {StateLogsTable, ValidationLogsTable} from "./Logs";
 import {FeaturesTable} from "./Features";
+import {ForeignResourcesTable} from "./ForeignResources";
 
 function Copyright() {
   return (
@@ -43,18 +44,15 @@ function Logs() {
   const classes = useStyles();
 
   return (
-      <div>
       <Grid item xs={12}>
         <Paper className={classes.paper}>
           <StateLogsTable/>
         </Paper>
-      </Grid>
-      <Grid item xs={12}>
+        <li></li>
         <Paper className={classes.paper}>
           <ValidationLogsTable/>
         </Paper>
       </Grid>
-      </div>
   );
 }
 
@@ -88,7 +86,7 @@ function ForeignResources() {
   return (
       <Grid item xs={12}>
         <Paper className={classes.paper}>
-          Foreign Resources Unsupported..
+          <ForeignResourcesTable/>
         </Paper>
       </Grid>
   );

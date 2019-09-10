@@ -48,7 +48,10 @@ func (r *ForeignResource) details() string {
 }
 
 func (r *ForeignResource) writeTopLevelFields(dst map[string]interface{}) {
-
+	dst["date_time"] = r.DiscoveredTimestamp
+	dst["resource_id"] = r.ResourceId
+	dst["resource_type"] = r.ResourceType
+	dst["is_exception"] = r.IsException
 }
 
 func (r *ForeignResource) writeDetailedFields(dst map[string]interface{}) {
