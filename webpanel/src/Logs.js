@@ -11,11 +11,27 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 
 const axios = require('axios');
 
-function ValidationState(data) {
-    if (data.compliance_errors === 0) {
-        return <Typography color="primary" component="body1">{data.compliance_tests}/{data.compliance_tests} tests</Typography>
+function ValidationText(errors, tests) {
+    if (errors === 0) {
+        return <Typography color="primary" component="body1">{tests}/{tests} tests</Typography>
     } else {
-        return <Typography color="secondary" component="body1">{data.compliance_tests-data.compliance_errors}/{data.compliance_tests} tests</Typography>
+        return <Typography color="secondary" component="body1">{tests-errors}/{tests} tests</Typography>
+    }
+}
+
+function ValidationState(data) {
+    let prevErrors = data.compliance_errors_prev;
+    let prevTests = data.compliance_tests_prev;
+    if (prevTests === 0) {
+        return ValidationText(data.compliance_errors, data.compliance_tests);
+    } else {
+        return (
+            <div>
+                {ValidationText(prevErrors, prevTests)}
+                ->
+                {ValidationText(data.compliance_errors, data.compliance_tests)}
+            </div>
+        )
     }
 }
 
@@ -132,7 +148,7 @@ export class StateLogsTable extends React.Component {
                                     <TableCell>{l.date_time}</TableCell>
                                     <TableCell>{l.details}</TableCell>
                                     <TableCell>{Lines(l)}</TableCell>
-                                    <TableCell>{ValidationState(l)} -> {ValidationState(l)}</TableCell>
+                                    <TableCell>{ValidationState(l)}</TableCell>
                                     <TableCell align="right">
                                         <Button>Details</Button>
                                         <Button>Delete</Button>

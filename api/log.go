@@ -101,10 +101,19 @@ func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
 	parsed, _ := parseComplianceOutput(l.Output)
 	dst["compliance_errors"] = parsed.ErrorCount()
 	dst["compliance_tests"] = parsed.TestCount()
+	dst["compliance_errors_prev"] = 0
+	dst["compliance_tests_prev"] = 0
+
 	if l.Kind == "tfstate" {
 		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
 		dst["lines_added"] = len(added)
 		dst["lines_removed"] = len(removed)
+
+		if l.PrevOutput != "" {
+			parsedPrev, _ := parseComplianceOutput(l.PrevOutput)
+			dst["compliance_errors_prev"] = parsedPrev.ErrorCount()
+			dst["compliance_tests_prev"] = parsedPrev.TestCount()
+		}
 	}
 }
 
