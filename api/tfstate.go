@@ -99,6 +99,8 @@ func (state *TFState) writeTopLevelFields(dst map[string]interface{}) {
 	parsed, _ := parseComplianceOutput(state.ComplianceResult)
 	dst["compliance_errors"] = parsed.ErrorCount()
 	dst["compliance_tests"] = parsed.TestCount()
+	dst["compliance_features"] = parsed.featurePassed
+	dst["compliance_fail_messages"] = parsed.failMessages
 }
 
 func (state *TFState) writeDetailedFields(dst map[string]interface{}) {

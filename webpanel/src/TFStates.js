@@ -9,6 +9,8 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
+import {Delete, Info} from "@material-ui/icons";
+import Tooltip from "@material-ui/core/Tooltip";
 
 function ComplianceText(data) {
     if (data.compliance_present === true) {
@@ -20,6 +22,66 @@ function ComplianceText(data) {
     } else {
         return <Typography>unchecked</Typography>
     }
+}
+
+
+function ComplianceDetails(data) {
+    if (data.compliance_present !== true) {
+        return <div/>
+    }
+    let passing = [];
+    let failing = [];
+    let errors = [];
+    for (var f in data.compliance_features) {
+        let result = data.compliance_features[f] === true;
+        if (result) {
+            passing.push(f);
+        } else {
+            failing.push(f);
+        }
+        let errorList = data.compliance_fail_messages[f];
+        if (errorList != null && errorList.length > 0) {
+            errorList.forEach((errName) => {
+                errors.push(f + ": " + errName);
+            });
+        }
+    }
+
+    return (
+        <div>
+            { passing.length > 0 ? "Passing:" : <div/> }
+            <ul>
+                {passing.map((k) =>
+                    <li>{k}</li>
+                )}
+            </ul>
+            { failing.length > 0 ? "Failing:" : <div/> }
+            <ul>
+                {failing.map((k) =>
+                    <li>{k}</li>
+                )}
+            </ul>
+            { errors.length > 0 ? "Errors:" : <div/> }
+            <ul>
+                {errors.map((k) =>
+                    <li>{k}</li>
+                )}
+            </ul>
+        </div>
+    );
+}
+
+function ComplianceTooltip(data) {
+    return (
+        <Tooltip
+            title={
+                <React.Fragment>
+                    {ComplianceDetails(data)}
+                </React.Fragment>
+            }>
+            <Info/>
+        </Tooltip>
+    );
 }
 
 export class TFStatesTable extends React.Component {
@@ -34,6 +96,8 @@ export class TFStatesTable extends React.Component {
                 this.setState({ tfstates });
             })
     }
+
+
 
     render() {
         if (this.state.tfstates.length === 0) {
@@ -50,7 +114,7 @@ export class TFStatesTable extends React.Component {
                             <TableCell>Path</TableCell>
                             <TableCell>Last Update</TableCell>
                             <TableCell>Compliant</TableCell>
-                            <TableCell align="right">Actions</TableCell>
+                            <TableCell align="right"/>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -60,10 +124,9 @@ export class TFStatesTable extends React.Component {
                                     <TableCell>{l.bucket}</TableCell>
                                     <TableCell>{l.path}</TableCell>
                                     <TableCell>{l.last_update}</TableCell>
-                                    <TableCell>{ComplianceText(l)}</TableCell>
+                                    <TableCell>{ComplianceText(l)} {ComplianceTooltip(l)}</TableCell>
                                     <TableCell align="right">
-                                        <Button>Details</Button>
-                                        <Button>Delete</Button>
+                                        <Button><Delete/></Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
