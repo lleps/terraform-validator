@@ -27,7 +27,8 @@ func (f *ComplianceFeature) details() string {
 }
 
 func (f *ComplianceFeature) writeTopLevelFields(dst map[string]interface{}) {
-	dst["enabled"] = rand.Int31n(3) == 0
+	dst["enabled"] = rand.Int31n(3) != 0
+	dst["source"] = f.FeatureSource
 }
 
 func (f *ComplianceFeature) writeDetailedFields(dst map[string]interface{}) {

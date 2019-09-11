@@ -9,8 +9,7 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import {TrendingFlat} from "@material-ui/icons";
-
-const axios = require('axios');
+import axios from 'axios';
 
 function ValidationText(errors, tests) {
     if (errors === 0) {
@@ -37,33 +36,10 @@ function ValidationState(data) {
 }
 
 function Lines(data) {
-    const added = data.lines_added;
-    const removed = data.lines_removed;
     if (data.compliance_tests_prev === 0) {
         return <div>new</div>
     }
 
-
-    /*if (added > 0 && removed === 0) { // +x;
-        return (
-            <div>
-                <Typography component="body1">+{added};</Typography>
-            </div>
-        )
-    } else if (added === 0 && removed > 0) {// -y;
-        return (
-            <div>
-                <Typography component="body1">-{removed};</Typography>
-            </div>
-        )
-    } else { // +x; -y
-        return (
-            <div>
-                <Typography component="body1">+{added}; </Typography>
-                <Typography component="body1">-{removed};</Typography>
-            </div>
-        )
-    }*/
     return <div>change</div>
 }
 

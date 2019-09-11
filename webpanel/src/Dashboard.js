@@ -13,32 +13,15 @@ import Badge from '@material-ui/core/Badge';
 import Container from '@material-ui/core/Container';
 import Grid from '@material-ui/core/Grid';
 import Paper from '@material-ui/core/Paper';
-import Link from '@material-ui/core/Link';
 import MenuIcon from '@material-ui/icons/Menu';
 import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
 import NotificationsIcon from '@material-ui/icons/Notifications';
 import { mainListItems, secondaryListItems } from './listItems';
-import { BrowserRouter as Router, Route } from "react-router-dom";
-import Chart from './Chart';
-import Deposits from './Deposits';
-import Orders from './Orders';
+import { Route } from "react-router-dom";
 import {TFStatesTable} from "./TFStates";
 import {StateLogsTable, ValidationLogsTable} from "./Logs";
 import {FeaturesTable} from "./Features";
 import {ForeignResourcesTable} from "./ForeignResources";
-
-function Copyright() {
-  return (
-    <Typography variant="body2" color="textSecondary" align="center">
-      {'Copyright © '}
-      <Link color="inherit" href="https://material-ui.com/">
-        Your Website
-      </Link>{' '}
-      {new Date().getFullYear()}
-      {'.'}
-    </Typography>
-  );
-}
 
 function Logs() {
   const classes = useStyles();
@@ -92,7 +75,6 @@ function ForeignResources() {
   );
 }
 
-// Draws content based on route
 function Content() {
   return (
       <Grid container spacing={3}>
@@ -194,7 +176,6 @@ export default function Dashboard() {
   const handleDrawerClose = () => {
     setOpen(false);
   };
-  const fixedHeightPaper = clsx(classes.paper, classes.fixedHeight);
 
   return (
     <div className={classes.root}>
@@ -211,7 +192,10 @@ export default function Dashboard() {
             <MenuIcon />
           </IconButton>
           <Typography component="h1" variant="h6" color="inherit" noWrap className={classes.title}>
-            Dashboard
+            <Route path="/" exact component={<b>Dashboard</b>} />
+            <Route path="/features" component={<b>asd</b>} />
+            <Route path="/tfstates" component={<b>ASdasd</b>} />
+            <Route path="/foreignresources" component={<b>TFStates</b>} />
           </Typography>
           <IconButton color="inherit">
             <Badge badgeContent={4} color="secondary">

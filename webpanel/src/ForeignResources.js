@@ -1,4 +1,3 @@
-import Typography from "@material-ui/core/Typography";
 import React from "react";
 import Title from "./Title";
 import Table from "@material-ui/core/Table";
@@ -8,9 +7,7 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
-
-const axios = require('axios');
-
+import axios from 'axios';
 
 export class ForeignResourcesTable extends React.Component {
     state = {

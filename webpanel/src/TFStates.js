@@ -8,8 +8,7 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
-
-const axios = require('axios');
+import axios from 'axios';
 
 function ComplianceText(data) {
     if (data.compliance_present === true) {

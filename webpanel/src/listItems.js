@@ -8,7 +8,6 @@ import LayersIcon from '@material-ui/icons/Layers';
 import AssignmentIcon from '@material-ui/icons/Assignment';
 import {Link} from "react-router-dom";
 
-// TODO: every item should redirect to the corresponding URL...
 export const mainListItems = (
     <div>
         <Link color="inherit" to="/">
