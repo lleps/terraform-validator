@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-
 	"log"
 	"net/http"
 	"strings"
@@ -41,9 +40,21 @@ func main() {
 	log.Printf("Listening on '%s'...", *listenFlag)
 	router := initEndpoints()
 
-	corsObj := handlers.AllowedOrigins([]string{"*"})
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
+	originsOk := handlers.AllowedOrigins([]string{"*"})
+	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 
-	log.Fatal(http.ListenAndServe(*listenFlag, handlers.CORS(corsObj)(router)))
+	corsHandler := handlers.CORS(headersOk, originsOk, methodsOk)(router)
+	loggingHandler := handlers.LoggingHandler(LogWriter{}, corsHandler)
+	log.Fatal(http.ListenAndServe(*listenFlag, loggingHandler))
+}
+
+// LogWriter used to log requests as regular calls to log.Printf
+type LogWriter struct{}
+
+func (_ LogWriter) Write(bytes []byte) (n int, err error) {
+	log.Print(string(bytes))
+	return
 }
 
 func initDB(prefix string) *database {

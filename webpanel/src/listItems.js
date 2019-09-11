@@ -10,41 +10,33 @@ import {Link} from "react-router-dom";
 
 export const mainListItems = (
     <div>
-        <Link color="inherit" to="/">
-            <ListItem button>
-                <ListItemIcon>
-                    <DashboardIcon />
-                </ListItemIcon>
-                <ListItemText primary="Dashboard" />
-            </ListItem>
-        </Link>
+        <ListItem component={Link} to={'/'} button>
+            <ListItemIcon>
+                <DashboardIcon />
+            </ListItemIcon>
+            <ListItemText primary="Dashboard" />
+        </ListItem>
 
-        <Link color="inherit" to="/features">
-            <ListItem button>
-                <ListItemIcon>
-                    <AssignmentIcon />
-                </ListItemIcon>
-                <ListItemText primary="Features" />
-            </ListItem>
-        </Link>
+        <ListItem component={Link} to={'/features'} button>
+            <ListItemIcon>
+                <AssignmentIcon />
+            </ListItemIcon>
+            <ListItemText primary="Features" />
+        </ListItem>
 
-        <Link color="inherit" to="/tfstates">
-            <ListItem button>
-                <ListItemIcon>
-                    <BarChartIcon />
-                </ListItemIcon>
-                <ListItemText primary="States" />
-            </ListItem>
-        </Link>
+        <ListItem component={Link} to={'/tfstates'} button>
+            <ListItemIcon>
+                <BarChartIcon />
+            </ListItemIcon>
+            <ListItemText primary="States" />
+        </ListItem>
 
-        <Link color="inherit" to="/foreignresources">
-            <ListItem button>
-                <ListItemIcon>
-                    <LayersIcon />
-                </ListItemIcon>
-                <ListItemText primary="Foreign Resources" />
-            </ListItem>
-        </Link>
+        <ListItem component={Link} to={'/foreignresources'} button>
+            <ListItemIcon>
+                <LayersIcon />
+            </ListItemIcon>
+            <ListItemText primary="Foreign Resources" />
+        </ListItem>
     </div>
 );
 

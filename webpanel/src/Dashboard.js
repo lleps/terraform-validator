@@ -192,10 +192,7 @@ export default function Dashboard() {
             <MenuIcon />
           </IconButton>
           <Typography component="h1" variant="h6" color="inherit" noWrap className={classes.title}>
-            <Route path="/" exact component={<b>Dashboard</b>} />
-            <Route path="/features" component={<b>asd</b>} />
-            <Route path="/tfstates" component={<b>ASdasd</b>} />
-            <Route path="/foreignresources" component={<b>TFStates</b>} />
+            sdasdasd
           </Typography>
           <IconButton color="inherit">
             <Badge badgeContent={4} color="secondary">

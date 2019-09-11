@@ -27,9 +27,6 @@ func registerEndpoint(
 		defer r.Body.Close()
 
 		code := http.StatusInternalServerError
-		defer func() {
-			log.Printf("%s %s [from %s]: HTTP %d", r.Method, r.URL, r.RemoteAddr, code)
-		}()
 
 		// parse body and vars
 		vars := mux.Vars(r)
@@ -47,6 +44,9 @@ func registerEndpoint(
 			_, _ = fmt.Fprint(w, err.Error())
 			log.Println("Handler error:", err)
 			return
+		}
+		if response == "" {
+			response = "{}"
 		}
 
 		// write response
