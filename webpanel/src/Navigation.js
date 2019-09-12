@@ -11,80 +11,10 @@ import Divider from '@material-ui/core/Divider';
 import IconButton from '@material-ui/core/IconButton';
 import Badge from '@material-ui/core/Badge';
 import Container from '@material-ui/core/Container';
-import Grid from '@material-ui/core/Grid';
-import Paper from '@material-ui/core/Paper';
 import MenuIcon from '@material-ui/icons/Menu';
 import ChevronLeftIcon from '@material-ui/icons/ChevronLeft';
 import NotificationsIcon from '@material-ui/icons/Notifications';
 import { mainListItems, secondaryListItems } from './listItems';
-import { Route } from "react-router-dom";
-import {TFStatesTable} from "./TFStates";
-import {StateLogsTable, ValidationLogsTable} from "./Logs";
-import {FeaturesTable} from "./Features";
-import {ForeignResourcesTable} from "./ForeignResources";
-
-function Logs() {
-  const classes = useStyles();
-
-  return (
-      <Grid item xs={12}>
-        <Paper className={classes.paper}>
-          <StateLogsTable/>
-        </Paper>
-        <li></li>
-        <Paper className={classes.paper}>
-          <ValidationLogsTable/>
-        </Paper>
-      </Grid>
-  );
-}
-
-function Features() {
-  const classes = useStyles();
-
-  return (
-      <Grid item xs={12}>
-        <Paper className={classes.paper}>
-          <FeaturesTable/>
-        </Paper>
-      </Grid>
-  );
-}
-
-function TFStates() {
-  const classes = useStyles();
-
-  return (
-      <Grid item xs={12}>
-        <Paper className={classes.paper}>
-          <TFStatesTable/>
-        </Paper>
-      </Grid>
-  );
-}
-
-function ForeignResources() {
-  const classes = useStyles();
-
-  return (
-      <Grid item xs={12}>
-        <Paper className={classes.paper}>
-          <ForeignResourcesTable/>
-        </Paper>
-      </Grid>
-  );
-}
-
-function Content() {
-  return (
-      <Grid container spacing={3}>
-        <Route path="/" exact component={Logs} />
-        <Route path="/features" component={Features} />
-        <Route path="/tfstates" component={TFStates} />
-        <Route path="/foreignresources" component={ForeignResources} />
-      </Grid>
-  );
-}
 
 const drawerWidth = 240;
 
@@ -167,7 +97,7 @@ const useStyles = makeStyles(theme => ({
   },
 }));
 
-export default function Dashboard() {
+export default function Navigation(props) {
   const classes = useStyles();
   const [open, setOpen] = React.useState(true);
   const handleDrawerOpen = () => {
@@ -192,7 +122,7 @@ export default function Dashboard() {
             <MenuIcon />
           </IconButton>
           <Typography component="h1" variant="h6" color="inherit" noWrap className={classes.title}>
-            sdasdasd
+            {props.title}
           </Typography>
           <IconButton color="inherit">
             <Badge badgeContent={4} color="secondary">
@@ -221,7 +151,7 @@ export default function Dashboard() {
       <main className={classes.content}>
         <div className={classes.appBarSpacer} />
         <Container maxWidth="lg" className={classes.container}>
-            <Content/>
+          {props.content()}
         </Container>
       </main>
     </div>
