@@ -8,11 +8,7 @@ import {LogDetailsDialog, StateLogsTable, ValidationLogsTable} from "./Logs";
 import {FeaturesTable} from "./Features";
 import {TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
-import {Button, makeStyles} from "@material-ui/core";
-import DialogContent from "@material-ui/core/DialogContent";
-import TextField from "@material-ui/core/TextField";
-import DialogActions from "@material-ui/core/DialogActions";
-import Dialog from "@material-ui/core/Dialog";
+import {makeStyles} from "@material-ui/core";
 
 const useStyles = makeStyles(theme => ({
     paper: {
@@ -24,11 +20,12 @@ const useStyles = makeStyles(theme => ({
 }));
 
 
-function Logs() {
+function Logs({ match }) {
     const classes = useStyles();
 
     return (
         <Grid item xs={12}>
+            <Route path={`${match.url}/:id`} component={LogDetails}/>
             <Paper className={classes.paper}>
                 <StateLogsTable/>
             </Paper>
@@ -53,11 +50,14 @@ function Features() {
 }
 
 function LogDetails(props) {
-    console.log("Props: " + props);
     let id = props.match.params.id;
-    console.log("id: " + id);
     return (
-        <LogDetailsDialog id={id} />
+        <LogDetailsDialog
+            id={id}
+            onClose={() => {
+                props.history.push(`/logs`)
+            }}
+        />
     );
 }
 
@@ -68,7 +68,6 @@ function TFStates({ match }) {
 
     return (
         <div>
-            <Route path={`${match.url}/:id`} component={LogDetails}/>
             <Grid item xs={12}>
                 <Paper className={classes.paper}>
                     <TFStatesTable/>
@@ -93,7 +92,7 @@ function ForeignResources() {
 function Routes() {
     return (
         <div>
-            <Route path="/" exact component={Logs}/>
+            <Route path="/logs" component={Logs}/>
             <Route path="/features" component={Features}/>
             <Route path="/tfstates" component={TFStates}/>
             <Route path="/foreignresources" component={ForeignResources}/>
@@ -124,8 +123,13 @@ should show both differences.
 
 small table:
 
-Features:
+Features
   other        passing
   s3_buckets   passing
+  none         passing => failing
+    error1 (red small)
+    error2
+
+Differences:
 
  */
