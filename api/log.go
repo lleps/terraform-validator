@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	"html"
 	"strconv"
 	"strings"
 )
@@ -118,7 +120,37 @@ func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
 }
 
 func (l *ValidationLog) writeDetailedFields(dst map[string]interface{}) {
+	l.writeTopLevelFields(dst)
+	// also write diff
+	diff := diffmatchpatch.New()
+	diffs := diff.DiffMain(l.PrevInputJson, l.InputJson, false)
+	result := diffsToPrettyHtml(diff, diffs)            // as html
+	result = strings.Replace(result, "	", "&emsp;", -1) // html tabs
+	dst["state_diff_html"] = result
+	fmt.Println(result)
+}
 
+// diffsToPrettyHtml converts a []Diff into a pretty HTML report.
+func diffsToPrettyHtml(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.Diff) string {
+	var buff bytes.Buffer
+	for _, diff := range diffs {
+		text := strings.Replace(html.EscapeString(diff.Text), "\n", "<br>", -1)
+		switch diff.Type {
+		case diffmatchpatch.DiffInsert:
+			_, _ = buff.WriteString("<ins style=\"background:#1B5E20;\">")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</ins>")
+		case diffmatchpatch.DiffDelete:
+			_, _ = buff.WriteString("<del style=\"background:#C62828;\">")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</del>")
+		case diffmatchpatch.DiffEqual:
+			_, _ = buff.WriteString("<span>")
+			_, _ = buff.WriteString(text)
+			_, _ = buff.WriteString("</span>")
+		}
+	}
+	return buff.String()
 }
 
 // database methods

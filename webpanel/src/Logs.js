@@ -10,6 +10,10 @@ import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import {TrendingFlat} from "@material-ui/icons";
 import axios from 'axios';
+import DialogContent from "@material-ui/core/DialogContent";
+import TextField from "@material-ui/core/TextField";
+import DialogActions from "@material-ui/core/DialogActions";
+import Dialog from "@material-ui/core/Dialog";
 
 function ValidationText(errors, tests) {
     if (errors === 0) {
@@ -92,6 +96,58 @@ export class ValidationLogsTable extends React.Component {
     }
 }
 
+export class LogDetailsDialog extends React.Component {
+    state = {
+        details: null
+    };
+
+    fixHtml(html) {
+        console.log("with p: " + html);
+        let withoutP = html.replace("&para;", "");
+        console.log("without p: " + withoutP);
+        return withoutP;
+    }
+
+    componentDidMount() {
+        console.log("props: " + this.props);
+        axios.get("http://localhost:8080/logs/json/" + this.props.id)
+            .then(res => {
+                const details = res.data;
+                this.setState({ details: details, fixedHtml: this.fixHtml(details.state_diff_html) });
+            })
+    }
+
+    render() {
+        if (this.state.details === null) {
+            return <div align="center"><CircularProgress/></div>
+        }
+
+        return (
+            <Dialog
+                fullWidth="md"
+                maxWidth="md"
+                open={true}
+                onClose={() => this.close()} aria-labelledby="form-dialog-title">
+                <DialogContent>
+                    <div
+                        className="code"
+                        dangerouslySetInnerHTML={{__html: this.state.fixedHtml} }>
+                    </div>
+                </DialogContent>
+                <DialogActions>
+                    { false ? this.loadingSpinner() : <div/> }
+                    <Button onClick={() => {}} color="primary">
+                        Cancel
+                    </Button>
+                    <Button onClick={() => {}} color="primary">
+                        Save
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        )
+    }
+}
+
 export class StateLogsTable extends React.Component {
     state = {
         logs: []
@@ -144,3 +200,20 @@ export class StateLogsTable extends React.Component {
         )
     }
 }
+
+/*
+tarea: mostrar la diff decentemente.
+no importa lo demas.
+
+ok. que es una diff decente:
+
+una diff html, pero que sea codigo.
+* mostrar una fuente monospaced
+* un fondo gris claro.
+* sacar icono del parrafo.
+* tabular correctamente el html
+* mejorar los colores
+
+ok,
+
+ */

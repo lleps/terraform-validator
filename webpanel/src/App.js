@@ -4,11 +4,15 @@ import {BrowserRouter as Router, Redirect, Route} from "react-router-dom";
 import Navigation from "./Navigation";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
-import {StateLogsTable, ValidationLogsTable} from "./Logs";
+import {LogDetailsDialog, StateLogsTable, ValidationLogsTable} from "./Logs";
 import {FeaturesTable} from "./Features";
 import {TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
-import {makeStyles} from "@material-ui/core";
+import {Button, makeStyles} from "@material-ui/core";
+import DialogContent from "@material-ui/core/DialogContent";
+import TextField from "@material-ui/core/TextField";
+import DialogActions from "@material-ui/core/DialogActions";
+import Dialog from "@material-ui/core/Dialog";
 
 const useStyles = makeStyles(theme => ({
     paper: {
@@ -48,15 +52,29 @@ function Features() {
     );
 }
 
-function TFStates() {
+function LogDetails(props) {
+    console.log("Props: " + props);
+    let id = props.match.params.id;
+    console.log("id: " + id);
+    return (
+        <LogDetailsDialog id={id} />
+    );
+}
+
+//
+
+function TFStates({ match }) {
     const classes = useStyles();
 
     return (
-        <Grid item xs={12}>
-            <Paper className={classes.paper}>
-                <TFStatesTable/>
-            </Paper>
-        </Grid>
+        <div>
+            <Route path={`${match.url}/:id`} component={LogDetails}/>
+            <Grid item xs={12}>
+                <Paper className={classes.paper}>
+                    <TFStatesTable/>
+                </Paper>
+            </Grid>
+        </div>
     );
 }
 
@@ -79,7 +97,6 @@ function Routes() {
             <Route path="/features" component={Features}/>
             <Route path="/tfstates" component={TFStates}/>
             <Route path="/foreignresources" component={ForeignResources}/>
-            <Redirect exact from="/" to="/"/>
         </div>
     );
 }
@@ -93,3 +110,22 @@ function App() {
 }
 
 export default App;
+/*
+
+log details.
+for 2 types.
+only focus on tfstate.
+you have:
+
+last state (nullable), state.
+last json (nullable), json.
+
+should show both differences.
+
+small table:
+
+Features:
+  other        passing
+  s3_buckets   passing
+
+ */
