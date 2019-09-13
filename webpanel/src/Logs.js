@@ -15,6 +15,7 @@ import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import Dialog from "@material-ui/core/Dialog";
 import {Link} from "react-router-dom";
+import DialogTitle from "@material-ui/core/DialogTitle";
 
 function ValidationText(errors, tests) {
     if (errors === 0) {
@@ -97,6 +98,28 @@ export class ValidationLogsTable extends React.Component {
     }
 }
 
+function FeatureState(passing) {
+    if (passing === true) {
+        return <Typography color="primary" component="body1">passing</Typography>
+    } else {
+        return <Typography color="secondary" component="body1">failing</Typography>
+    }
+}
+
+function FeatureChange(oldPassing, newPassing) {
+    if (oldPassing === newPassing) {
+        return <div>{FeatureState(newPassing)}</div>
+    }
+
+    return (
+        <div>
+            {FeatureState(oldPassing)}
+            <TrendingFlat/>
+            {FeatureState(newPassing)}
+        </div>
+    )
+}
+
 export class LogDetailsDialog extends React.Component {
     state = {
         details: null,
@@ -112,14 +135,54 @@ export class LogDetailsDialog extends React.Component {
     }
 
     render() {
+        let atDate = this.state.details !== null ? "at " + this.state.details.date_time : "";
+
         return (
             <Dialog
                 fullWidth="md"
                 maxWidth="md"
                 open={true}
-                onClose={() => this.props.onClose()} aria-labelledby="form-dialog-title">
+                onClose={() => this.props.onClose()} aria-labelledby="form-dialog-title"
+            >
+
+                <DialogTitle id="customized-dialog-title" onClose={() => {}}>
+                    Details for Event #{this.props.id} {atDate}
+                </DialogTitle>
                 <DialogContent>
                     { this.state.details === null ? <div align="center"><CircularProgress/></div> : "" }
+                    <Title>Features</Title>
+                    <Table size="small">
+                        <TableHead>
+                        </TableHead>
+                        <TableBody>
+                            <TableRow key={"1"}>
+                                <TableCell>s3_buckets</TableCell>
+                                <TableCell align="right">
+                                    <TableCell>{FeatureChange(true, true)}</TableCell>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow key={"2"}>
+                                <TableCell>other</TableCell>
+                                <TableCell align="right">
+                                    <TableCell>{FeatureChange(true, true)}</TableCell>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow key={"3"}>
+                                <TableCell>access_groups</TableCell>
+                                <TableCell align="right">
+                                    <TableCell>{FeatureChange(false, false)}</TableCell>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow key={"4"}>
+                                <TableCell>security_groups</TableCell>
+                                <TableCell align="right">
+                                    <TableCell>{FeatureChange(true, false)}</TableCell>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+
+                    <Title>State Diff</Title>
                     <div
                         className="code"
                         dangerouslySetInnerHTML={{__html: this.state.diffHtml} }>

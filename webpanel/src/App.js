@@ -124,12 +124,13 @@ should show both differences.
 small table:
 
 Features
-  other        passing
+  other        failing (i)
   s3_buckets   passing
-  none         passing => failing
-    error1 (red small)
-    error2
+  none         passing => failing (i)
 
 Differences:
+
+
+(i): tooltip with information.
 
  */
