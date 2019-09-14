@@ -13,9 +13,11 @@ import axios from 'axios';
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import Dialog from "@material-ui/core/Dialog";
-import {Link} from "react-router-dom";
+import {Link as RouterLink} from "react-router-dom";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import Tooltip from "@material-ui/core/Tooltip";
+import Link from "@material-ui/core/Link";
+import IconButton from "@material-ui/core/IconButton";
 
 function ValidationText(errors, tests) {
     if (errors === 0) {
@@ -75,7 +77,7 @@ export class ValidationLogsTable extends React.Component {
                         <TableRow>
                             <TableCell>Date</TableCell>
                             <TableCell>Result</TableCell>
-                            <TableCell align="right">Actions</TableCell>
+                            <TableCell align="right" />
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -86,8 +88,12 @@ export class ValidationLogsTable extends React.Component {
                                     <TableCell>{l.date_time}</TableCell>
                                     <TableCell>{ValidationState(l)}</TableCell>
                                     <TableCell align="right">
-                                        <Button>Details</Button>
-                                        <Button>Delete</Button>
+                                        <IconButton onClick={() => this.props.onSelectInfo(l.id)} >
+                                            <Info/>
+                                        </IconButton>
+                                        <IconButton>
+                                            <Delete/>
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -125,6 +131,11 @@ function FeaturePassingChange({ oldPassing, newPassing, oldErrors, newErrors}) {
 }
 
 export class LogDetailsDialog extends React.Component {
+
+    constructor(props) {
+        super(props);
+    }
+
     state = {
         details: null,
         diffHtml: ""
@@ -210,6 +221,10 @@ export class LogDetailsDialog extends React.Component {
 }
 
 export class StateLogsTable extends React.Component {
+    constructor(props) {
+        super(props);
+    }
+
     state = {
         logs: []
     };
@@ -250,8 +265,12 @@ export class StateLogsTable extends React.Component {
                                     <TableCell>{Lines(l)}</TableCell>
                                     <TableCell>{ValidationState(l)}</TableCell>
                                     <TableCell align="right">
-                                        <Link to={"/logs/" + l.id}><Info/></Link>
-                                        <Link to={"/logs/" + l.id}><Delete/></Link>
+                                        <IconButton onClick={() => this.props.onSelectInfo(l.id)} >
+                                            <Info/>
+                                        </IconButton>
+                                        <IconButton>
+                                            <Delete/>
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -261,20 +280,3 @@ export class StateLogsTable extends React.Component {
         )
     }
 }
-
-/*
-tarea: mostrar la diff decentemente.
-no importa lo demas.
-
-ok. que es una diff decente:
-
-una diff html, pero que sea codigo.
-* mostrar una fuente monospaced
-* un fondo gris claro.
-* sacar icono del parrafo.
-* tabular correctamente el html
-* mejorar los colores
-
-ok,
-
- */

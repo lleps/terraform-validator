@@ -8,6 +8,8 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
+import {Info} from "@material-ui/icons";
+import Tooltip from "@material-ui/core/Tooltip";
 
 export class ForeignResourcesTable extends React.Component {
     state = {
@@ -35,8 +37,7 @@ export class ForeignResourcesTable extends React.Component {
                         <TableRow>
                             <TableCell>Date</TableCell>
                             <TableCell>Type</TableCell>
-                            <TableCell>ID</TableCell>
-                            <TableCell align="right">Actions</TableCell>
+                            <TableCell>Resource</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -45,10 +46,15 @@ export class ForeignResourcesTable extends React.Component {
                                 <TableRow key={l.id}>
                                     <TableCell>{l.date_time}</TableCell>
                                     <TableCell>{l.resource_type}</TableCell>
-                                    <TableCell>{l.resource_id}</TableCell>
-                                    <TableCell align="right">
-                                        <Button>Details</Button>
-                                        <Button>Exclude</Button>
+                                    <TableCell>
+                                        {l.resource_id}
+                                        <Tooltip>
+                                            title={
+                                            <React.Fragment>
+                                                {l.resource_details}
+                                            </React.Fragment>}>
+                                            <Info/>
+                                        </Tooltip>
                                     </TableCell>
                                 </TableRow>
                             ))}

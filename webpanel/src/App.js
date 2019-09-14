@@ -20,18 +20,22 @@ const useStyles = makeStyles(theme => ({
 }));
 
 
-function Logs({ match }) {
+function Logs(props) {
     const classes = useStyles();
 
     return (
         <Grid item xs={12}>
-            <Route path={`${match.url}/:id`} component={LogDetails}/>
+            <Route path={`${props.match.url}/:id`} component={LogDetails}/>
             <Paper className={classes.paper}>
-                <StateLogsTable/>
+                <StateLogsTable
+                    onSelectInfo={(id) => props.history.push("/logs/" + id) }
+                />
             </Paper>
             <li></li>
             <Paper className={classes.paper}>
-                <ValidationLogsTable/>
+                <ValidationLogsTable
+                    onSelectInfo={(id) => props.history.push("/logs/" + id) }
+                />
             </Paper>
         </Grid>
     );

@@ -14,6 +14,8 @@ import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import axios from 'axios';
 import {Delete, Edit} from "@material-ui/icons";
+import Link from "@material-ui/core/Link";
+import IconButton from "@material-ui/core/IconButton";
 
 function EnabledState(data) {
     if (data.enabled === true) {
@@ -105,8 +107,10 @@ export class FeaturesTable extends React.Component {
                                         <TableCell>{f.id}</TableCell>
                                         <TableCell>{EnabledState(f)}</TableCell>
                                         <TableCell align="right">
-                                            <Button onClick={e => this.onClickEdit(e, f.id, f.source)}><Edit/></Button>
-                                            <Button><Delete/></Button>
+                                            <IconButton onClick={e => this.onClickEdit(e, f.id, f.source)}>
+                                                <Edit/>
+                                            </IconButton>
+                                            <IconButton><Delete/></IconButton>
                                         </TableCell>
                                     </TableRow>
                                 ))}
