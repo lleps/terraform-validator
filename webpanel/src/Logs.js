@@ -11,11 +11,11 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import {Delete, Info, TrendingFlat} from "@material-ui/icons";
 import axios from 'axios';
 import DialogContent from "@material-ui/core/DialogContent";
-import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import Dialog from "@material-ui/core/Dialog";
 import {Link} from "react-router-dom";
 import DialogTitle from "@material-ui/core/DialogTitle";
+import Tooltip from "@material-ui/core/Tooltip";
 
 function ValidationText(errors, tests) {
     if (errors === 0) {
@@ -98,25 +98,29 @@ export class ValidationLogsTable extends React.Component {
     }
 }
 
-function FeatureState(passing) {
-    if (passing === true) {
-        return <Typography color="primary" component="body1">passing</Typography>
-    } else {
-        return <Typography color="secondary" component="body1">failing</Typography>
-    }
+function FeaturePassing({ passing, errors}) {
+    return <span>
+        <Typography color={passing ? "primary" : "secondary"} component="body1">
+            {passing ? "passing" : "failing"}
+        </Typography>
+        { (errors != null && !passing)
+            ? <Tooltip title={<ul>{errors.map((err) => <li>{err}</li>)}</ul>}><Info/></Tooltip>
+            : ""
+        }
+    </span>;
 }
 
-function FeatureChange(oldPassing, newPassing) {
-    if (oldPassing === newPassing) {
-        return <div>{FeatureState(newPassing)}</div>
+function FeaturePassingChange({ oldPassing, newPassing, oldErrors, newErrors}) {
+    if (oldPassing === newPassing || oldPassing == null) {
+        return <FeaturePassing passing={newPassing} errors={newErrors}/>
     }
 
     return (
-        <div>
-            {FeatureState(oldPassing)}
+        <span>
+            <FeaturePassing passing={oldPassing} errors={oldErrors}/>
             <TrendingFlat/>
-            {FeatureState(newPassing)}
-        </div>
+            <FeaturePassing passing={newPassing} errors={newErrors}/>
+        </span>
     )
 }
 
@@ -137,14 +141,29 @@ export class LogDetailsDialog extends React.Component {
     render() {
         let atDate = this.state.details !== null ? "at " + this.state.details.date_time : "";
 
+        // Add all features, prev and current, to this list.
+        let allFeatures = [];
+        if (this.state.details !== null) {
+            let featuresNow = this.state.details.compliance_features;
+            let featuresPrev = this.state.details.compliance_features_prev;
+            if (featuresNow != null) {
+                for (let f in featuresNow) {
+                    if (allFeatures.indexOf(f) === -1) allFeatures.push(f);
+                }
+            }
+            if (featuresPrev != null) {
+                for (let f in featuresPrev) {
+                    if (allFeatures.indexOf(f) === -1) allFeatures.push(f);
+                }
+            }
+        }
+
         return (
             <Dialog
                 fullWidth="md"
                 maxWidth="md"
                 open={true}
-                onClose={() => this.props.onClose()} aria-labelledby="form-dialog-title"
-            >
-
+                onClose={() => this.props.onClose()} aria-labelledby="form-dialog-title">
                 <DialogTitle id="customized-dialog-title" onClose={() => {}}>
                     Details for Event #{this.props.id} {atDate}
                 </DialogTitle>
@@ -155,30 +174,21 @@ export class LogDetailsDialog extends React.Component {
                         <TableHead>
                         </TableHead>
                         <TableBody>
-                            <TableRow key={"1"}>
-                                <TableCell>s3_buckets</TableCell>
-                                <TableCell align="right">
-                                    <TableCell>{FeatureChange(true, true)}</TableCell>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow key={"2"}>
-                                <TableCell>other</TableCell>
-                                <TableCell align="right">
-                                    <TableCell>{FeatureChange(true, true)}</TableCell>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow key={"3"}>
-                                <TableCell>access_groups</TableCell>
-                                <TableCell align="right">
-                                    <TableCell>{FeatureChange(false, false)}</TableCell>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow key={"4"}>
-                                <TableCell>security_groups</TableCell>
-                                <TableCell align="right">
-                                    <TableCell>{FeatureChange(true, false)}</TableCell>
-                                </TableCell>
-                            </TableRow>
+                            { allFeatures.map((f) =>
+                                <TableRow key={f}>
+                                    <TableCell>{f}</TableCell>
+                                    <TableCell align="right">
+                                        <TableCell>
+                                            <FeaturePassingChange
+                                                oldPassing={(this.state.details.compliance_features_prev || {})[f]}
+                                                newPassing={this.state.details.compliance_features[f]}
+                                                oldErrors={(this.state.details.compliance_fail_messages_prev || {})[f]}
+                                                newErrors={this.state.details.compliance_fail_messages[f]}
+                                            />
+                                        </TableCell>
+                                    </TableCell>
+                                </TableRow>
+                            ) }
                         </TableBody>
                     </Table>
 

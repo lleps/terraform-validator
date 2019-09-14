@@ -121,13 +121,26 @@ func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
 
 func (l *ValidationLog) writeDetailedFields(dst map[string]interface{}) {
 	l.writeTopLevelFields(dst)
-	// also write diff
+
+	// Write state diff
 	diff := diffmatchpatch.New()
 	diffs := diff.DiffMain(l.PrevInputJson, l.InputJson, false)
 	result := diffsToPrettyHtml(diff, diffs)            // as html
-	result = strings.Replace(result, "	", "&emsp;", -1) // html tabs
+	result = strings.Replace(result, "	", "&emsp;", -1) // Replace regular tabs with html tabs
 	dst["state_diff_html"] = result
-	fmt.Println(result)
+
+	// Write feature details.
+	// Frontend can check for prev output presence using compliance_prev == true.
+	// All other fields ending with _prev are present only if l.PrevOutput != "".
+	parsed, _ := parseComplianceOutput(l.Output) // TODO: err?
+	dst["compliance_features"] = parsed.featurePassed
+	dst["compliance_fail_messages"] = parsed.failMessages
+	dst["compliance_prev"] = l.PrevOutput != ""
+	if dst["compliance_prev"] == true {
+		parsedPrev, _ := parseComplianceOutput(l.PrevOutput) // TODO: err?
+		dst["compliance_features_prev"] = parsedPrev.featurePassed
+		dst["compliance_fail_messages_prev"] = parsedPrev.failMessages
+	}
 }
 
 // diffsToPrettyHtml converts a []Diff into a pretty HTML report.

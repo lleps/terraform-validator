@@ -32,7 +32,7 @@ function ComplianceDetails(data) {
     let passing = [];
     let failing = [];
     let errors = [];
-    for (var f in data.compliance_features) {
+    for (let f in data.compliance_features) {
         let result = data.compliance_features[f] === true;
         if (result) {
             passing.push(f);
