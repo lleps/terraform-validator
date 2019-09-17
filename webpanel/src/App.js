@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import {BrowserRouter as Router, Redirect, Route} from "react-router-dom";
+import {BrowserRouter as Router, Route} from "react-router-dom";
 import Navigation from "./Navigation";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
@@ -9,6 +9,7 @@ import {FeaturesTable} from "./Features";
 import {TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
+import FloatingActionButtons from "./Fab";
 
 const useStyles = makeStyles(theme => ({
     paper: {
@@ -49,6 +50,7 @@ function Features() {
             <Paper className={classes.paper}>
                 <FeaturesTable/>
             </Paper>
+            <FloatingActionButtons/>
         </Grid>
     );
 }
@@ -77,6 +79,7 @@ function TFStates({ match }) {
                     <TFStatesTable/>
                 </Paper>
             </Grid>
+            <FloatingActionButtons/>
         </div>
     );
 }
@@ -113,28 +116,3 @@ function App() {
 }
 
 export default App;
-/*
-
-log details.
-for 2 types.
-only focus on tfstate.
-you have:
-
-last state (nullable), state.
-last json (nullable), json.
-
-should show both differences.
-
-small table:
-
-Features
-  other        failing (i)
-  s3_buckets   passing
-  none         passing => failing (i)
-
-Differences:
-
-
-(i): tooltip with information.
-
- */

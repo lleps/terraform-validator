@@ -48,19 +48,13 @@ export class ForeignResourcesTable extends React.Component {
                                     <TableCell>{l.resource_type}</TableCell>
                                     <TableCell>
                                         {l.resource_id}
-                                        <Tooltip>
-                                            title={
-                                            <React.Fragment>
-                                                {l.resource_details}
-                                            </React.Fragment>}>
-                                            <Info/>
-                                        </Tooltip>
                                     </TableCell>
                                 </TableRow>
                             ))}
                     </TableBody>
                 </Table>
             </React.Fragment>
+
         )
     }
 }
