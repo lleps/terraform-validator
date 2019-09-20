@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"math/rand"
 )
 
 // ComplianceFeature stores a feature to test terraform code against.
@@ -27,7 +26,7 @@ func (f *ComplianceFeature) details() string {
 }
 
 func (f *ComplianceFeature) writeTopLevelFields(dst map[string]interface{}) {
-	dst["enabled"] = rand.Int31n(3) != 0
+	dst["enabled"] = true
 	dst["source"] = f.FeatureSource
 }
 

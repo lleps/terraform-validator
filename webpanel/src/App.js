@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import {BrowserRouter as Router, Route} from "react-router-dom";
+import {BrowserRouter as Router, Redirect, Route} from "react-router-dom";
 import Navigation from "./Navigation";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
@@ -139,6 +139,9 @@ function ForeignResources() {
 function Routes() {
     return (
         <div>
+            <Route exact path="/" render={() => (
+                <Redirect to="/logs"/>
+            )}/>
             <Route path="/logs" component={Logs}/>
             <Route path="/features" component={Features}/>
             <Route path="/tfstates" component={TFStates}/>
