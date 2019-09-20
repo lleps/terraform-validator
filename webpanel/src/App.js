@@ -46,10 +46,15 @@ function Logs(props) {
 function FeatureAdd(props) {
     return (
         <FeatureAddDialog
-            onAdd={(name) => props.history.push("/features/edit/" + name)}
+            onAdd={(name) => pushRefresh(props.history, "/features/edit/" + name)}
             onCancel={() => props.history.push("/features")}
         />
     );
+}
+
+function pushRefresh(history, url) {
+    history.push("/");
+    history.push(url);
 }
 
 function FeatureEdit(props) {
