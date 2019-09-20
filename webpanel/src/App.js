@@ -5,7 +5,7 @@ import Navigation from "./Navigation";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
 import {LogDetailsDialog, StateLogsTable, ValidationLogsTable} from "./Logs";
-import {FeaturesTable} from "./Features";
+import {FeatureAddDialog, FeatureEditDialog, FeaturesTable} from "./Features";
 import {TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
@@ -42,15 +42,38 @@ function Logs(props) {
     );
 }
 
-function Features() {
+
+function FeatureAdd(props) {
+    return (
+        <FeatureAddDialog
+            onAdd={(name) => props.history.push("/features/edit/" + name)}
+            onCancel={() => props.history.push("/features")}
+        />
+    );
+}
+
+function FeatureEdit(props) {
+    let id = props.match.params.id;
+    return (
+        <FeatureEditDialog
+            id={id}
+            onCancel={() => props.history.push("/features")}
+            onSave={() => props.history.push("/features")}
+        />
+    );
+}
+
+function Features(props) {
     const classes = useStyles();
 
     return (
         <Grid item xs={12}>
+            <Route path={`${props.match.url}/add`} component={FeatureAdd} />
+            <Route path={`${props.match.url}/edit/:id`} component={FeatureEdit} />
             <Paper className={classes.paper}>
-                <FeaturesTable/>
+                <FeaturesTable onSelect={(id) => props.history.push("/features/edit/" + id)} />
             </Paper>
-            <FloatingActionButtons/>
+            <FloatingActionButtons onClick={() => props.history.push("/features/add")} />
         </Grid>
     );
 }
@@ -69,7 +92,7 @@ function LogDetails(props) {
 
 //
 
-function TFStates({ match }) {
+function TFStates() {
     const classes = useStyles();
 
     return (
@@ -108,11 +131,11 @@ function Routes() {
 }
 
 function App() {
-  return (
-      <Router>
-          <Navigation title={"Terraform Monitor"} content={Routes}/>
-      </Router>
-  );
+    return (
+        <Router>
+            <Navigation title={"Terraform Monitor"} content={Routes}/>
+        </Router>
+    );
 }
 
 export default App;

@@ -14,10 +14,150 @@ import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import axios from 'axios';
 import {Delete, Edit} from "@material-ui/icons";
-import Link from "@material-ui/core/Link";
 import IconButton from "@material-ui/core/IconButton";
+import DialogTitle from "@material-ui/core/DialogTitle";
 
-function EnabledState(data) {
+export function FeatureAddDialog({ onAdd, onCancel }) {
+    const [name, setName] = React.useState("");
+    const [inputError, setInputError] = React.useState("");
+
+    function onClickOk() {
+        axios.get(`http://localhost:8080/features/json`).then(res => {
+            if (res.data.findIndex(obj => obj.id === name) === -1) {
+                axios.post(`http://localhost:8080/features`, {
+                    name: name,
+                    source: "Feature: " + name + "\n\n",
+                }).then(() => {
+                    if (!nameIsValid(name)) {
+                        setInputError("Invalid name.");
+                    } else {
+                        onAdd(name);
+                    }
+                }).catch(error => {
+                    console.log(error);
+                })
+            } else {
+                setInputError("Feature '" + name + "' already exists.");
+            }
+        }).catch(error => {
+            console.log(error);
+        })
+    }
+
+    function handleChange(e) {
+        setName(e.target.value);
+        if (!nameIsValid(e.target.value)) {
+            setInputError("Must match regex 'a-zA-Z0-9_'.");
+        } else {
+            setInputError("");
+        }
+    }
+
+    function nameIsValid(name) {
+        let regex = new RegExp("^[a-zA-Z0-9_]*$");
+        return name.length > 0 && name.length < 30 && regex.test(name);
+    }
+
+    return <div>
+        <Dialog open={true} >
+            <DialogTitle> Add Feature</DialogTitle>
+            <DialogContent>
+                <TextField
+                    autoComplete="off"
+                    autoFocus
+                    value={name}
+                    margin="dense"
+                    id="name"
+                    label="Feature name"
+                    onChange={handleChange}
+                    error={inputError !== ""}
+                    helperText={inputError}
+                    type="text"
+                    fullWidth
+                />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => onCancel()} color="primary">
+                    Cancel
+                </Button>
+                <Button onClick={() => onClickOk()} color="primary" disabled={!nameIsValid(name) || inputError !== ""}>
+                    Create
+                </Button>
+            </DialogActions>
+        </Dialog>
+    </div>
+}
+
+export function FeatureEditDialog({ id, onSave, onCancel }) {
+    const [source, setSource] = React.useState("");
+    const [loading, setLoading] = React.useState(true);
+    const [saving, setSaving] = React.useState(false);
+
+    React.useEffect(() => {
+        axios.get("http://localhost:8080/features/json/" + id)
+            .then(res => {
+                setSource(res.data.source);
+                setLoading(false);
+            })
+            .catch(err => console.log("error getting details: " + err));
+    }, []);
+
+    function save() {
+        setSaving(true);
+        axios.post(`http://localhost:8080/features`, {
+            name: id,
+            source: source,
+        }).then(() => {
+            setSaving(false);
+            onSave();
+        }).catch(error => {
+            console.log(error);
+        })
+    }
+
+    let body;
+    if (loading) {
+        body = <div align={"center"}><CircularProgress/></div>;
+    } else {
+        body = <TextField
+            id="filled-full-width"
+            multiline
+            label={id}
+            rowsMax="20"
+            inputProps={{
+                style: {fontSize: 15, fontFamily: "Monospace" }
+            }}
+            value={source}
+            onChange={e => setSource(e.target.value)}
+            fullWidth
+            margin="normal"
+            variant="filled"
+        />
+    }
+
+    return (
+        <Dialog
+            fullWidth="md"
+            maxWidth="md"
+            open={true}
+            onClose={() => onCancel()} aria-labelledby="form-dialog-title">
+            <DialogContent>
+                {body}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => onCancel()} color="primary">
+                    Cancel
+                </Button>
+                <Button onClick={() => save()} color="primary">
+                    Save
+                </Button>
+                { saving ? <CircularProgress/> : "" }
+            </DialogActions>
+        </Dialog>
+    )
+}
+
+function FeatureEnabledLabel(data) {
     if (data.enabled === true) {
         return <Typography color="primary">enabled</Typography>
     } else {
@@ -28,24 +168,10 @@ function EnabledState(data) {
 export class FeaturesTable extends React.Component {
     state = {
         features: [],
-        editing: false,
-        editingFeature: "none",
-        editingSource: "none",
         loadingTable: false,
-        updatingFeature: false,
     };
 
-    onSourceChange(e) {
-        this.setState({ editingSource: e.target.value })
-    }
-
-    onClickEdit(e, feature, source) {
-        if (this.state.loadingTable) return;
-
-        this.setState({ editing: true, editingFeature: feature, editingSource: source });
-    }
-
-    fetchTable() {
+    componentDidMount() {
         this.setState({ loadingTable: true });
 
         axios.get(`http://localhost:8080/features/json`).then(res => {
@@ -57,102 +183,36 @@ export class FeaturesTable extends React.Component {
         })
     }
 
-    save() {
-        if (this.state.editingFeature === "none") return;
-
-        this.setState({ updatingFeature: true });
-
-        axios.post(`http://localhost:8080/features`, {
-            name: this.state.editingFeature,
-            source: this.state.editingSource,
-        }).then(() => {
-            this.fetchTable();
-            this.setState({ editing: false, editingFeature: "none", editingSource: "none", updatingFeature: false });
-        }).catch(error => {
-            console.log(error);
-        })
-    }
-
-    close() {
-        this.setState({ editing: false })
-    }
-
-    componentDidMount() {
-        this.fetchTable()
-    }
-
-    loadingSpinner() {
-        return <div align="center"><CircularProgress/></div>
-    }
-
     render() {
-        return (
-            <div>
-
-                { /* table */ }
-                <React.Fragment>
-                    <Title>Features</Title>
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Name</TableCell>
-                                <TableCell>State</TableCell>
-                                <TableCell />
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            { this.state.features
-                                .map(f => (
-                                    <TableRow key={f.id}>
-                                        <TableCell>{f.id}</TableCell>
-                                        <TableCell>{EnabledState(f)}</TableCell>
-                                        <TableCell align="right">
-                                            <IconButton onClick={e => this.onClickEdit(e, f.id, f.source)}>
-                                                <Edit/>
-                                            </IconButton>
-                                            <IconButton><Delete/></IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                        </TableBody>
-                    </Table>
-                    { this.state.loadingTable ? this.loadingSpinner() : <div/> }
-
-                </React.Fragment>
-
-                { /* edit dialog */ }
-                <Dialog
-                    fullWidth="md"
-                    maxWidth="md"
-                    open={this.state.editing}
-                    onClose={() => this.close()} aria-labelledby="form-dialog-title">
-                    <DialogContent>
-                        <TextField
-                            id="filled-full-width"
-                            multiline
-                            label={ this.state.editingFeature }
-                            rowsMax="20"
-                            inputProps={{
-                                style: {fontSize: 15, fontFamily: "Monospace" }
-                            }}
-                            value={this.state.editingSource}
-                            onChange={e => this.onSourceChange(e)}
-                            fullWidth
-                            margin="normal"
-                            variant="filled"
-                        />
-                    </DialogContent>
-                    <DialogActions>
-                        { this.state.updatingFeature ? this.loadingSpinner() : <div/> }
-                        <Button onClick={() => this.close()} color="primary">
-                            Cancel
-                        </Button>
-                        <Button onClick={() => this.save()} color="primary">
-                            Save
-                        </Button>
-                    </DialogActions>
-                </Dialog>
-            </div>
-        )
+        return  (
+            <React.Fragment>
+                <Title>Features</Title>
+                <Table size="small">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Name</TableCell>
+                            <TableCell>State</TableCell>
+                            <TableCell />
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        { this.state.features
+                            .map(f => (
+                                <TableRow key={f.id}>
+                                    <TableCell>{f.id}</TableCell>
+                                    <TableCell>{FeatureEnabledLabel(f)}</TableCell>
+                                    <TableCell align="right">
+                                        <IconButton onClick={() => this.props.onSelect(f.id)}>
+                                            <Edit/>
+                                        </IconButton>
+                                        <IconButton><Delete/></IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                    </TableBody>
+                </Table>
+                { this.state.loadingTable ? <div align="center"><CircularProgress/></div> : "" }
+            </React.Fragment>
+        );
     }
 }

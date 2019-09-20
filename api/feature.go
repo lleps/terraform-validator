@@ -32,7 +32,7 @@ func (f *ComplianceFeature) writeTopLevelFields(dst map[string]interface{}) {
 }
 
 func (f *ComplianceFeature) writeDetailedFields(dst map[string]interface{}) {
-
+	f.writeTopLevelFields(dst)
 }
 
 // Database methods
