@@ -171,18 +171,18 @@ function FeatureEnabledLabel(data) {
 export class FeaturesTable extends React.Component {
     state = {
         features: [],
-        loadingTable: false,
-        deleteSelect: null,
+        updating: false,
+        deleting: null,
     };
 
     fetchData() {
-        this.setState({ loadingTable: true });
+        this.setState({ updating: true });
 
         axios.get(`http://localhost:8080/features/json`).then(res => {
             const features = res.data;
-            this.setState({ features: features, loadingTable: false });
+            this.setState({ features: features, updating: false });
         }).catch(error => {
-            this.setState({ loadingTable: false });
+            this.setState({ updating: false });
             console.log(error);
         })
     }
@@ -194,15 +194,15 @@ export class FeaturesTable extends React.Component {
     render() {
         return  (
             <React.Fragment>
-                { this.state.deleteSelect != null
+                { this.state.deleting != null
                     ? <DeleteDialog
-                        message={"Delete feature '" + this.state.deleteSelect + "'?"}
-                        deleteUrl={"http://localhost:8080/features/" + this.state.deleteSelect}
+                        message={"Delete feature '" + this.state.deleting + "'?"}
+                        deleteUrl={"http://localhost:8080/features/" + this.state.deleting}
                         onDelete={() => {
-                            this.setState({ deleteSelect: null});
+                            this.setState({ deleting: null});
                             this.fetchData()
                         }}
-                        onCancel={() => this.setState({ deleteSelect: null })}
+                        onCancel={() => this.setState({ deleting: null })}
                     />
                     : ""
                 }
@@ -226,7 +226,7 @@ export class FeaturesTable extends React.Component {
                                         <IconButton onClick={() => this.props.onSelect(f.id)}>
                                             <Edit/>
                                         </IconButton>
-                                        <IconButton onClick={() => this.setState({ deleteSelect: f.id })}>
+                                        <IconButton onClick={() => this.setState({ deleting: f.id })}>
                                             <Delete/>
                                         </IconButton>
                                     </TableCell>
@@ -234,7 +234,7 @@ export class FeaturesTable extends React.Component {
                             ))}
                     </TableBody>
                 </Table>
-                { this.state.loadingTable ? <div align="center"><CircularProgress/></div> : "" }
+                { this.state.updating ? <div align="center"><CircularProgress/></div> : "" }
             </React.Fragment>
         );
     }

@@ -182,7 +182,7 @@ function TableEntryComplianceTooltip(data) {
 export class TFStatesTable extends React.Component {
     state = {
         tfstates: [],
-        deleteSelect: null,
+        deleting: null,
         updating: false
     };
 
@@ -203,12 +203,12 @@ export class TFStatesTable extends React.Component {
     render() {
         return (
             <React.Fragment>
-                { this.state.deleteSelect != null ? <DeleteDialog
-                    deleteUrl={"http://localhost:8080/tfstates/" + this.state.deleteSelect}
-                    message={"Delete TFState #" + this.state.deleteSelect + "?"}
-                    onCancel={() => this.setState({ deleteSelect: null })}
+                { this.state.deleting != null ? <DeleteDialog
+                    deleteUrl={"http://localhost:8080/tfstates/" + this.state.deleting}
+                    message={"Delete TFState #" + this.state.deleting + "?"}
+                    onCancel={() => this.setState({ deleting: null })}
                     onDelete={() => {
-                        this.setState({ deleteSelect: null });
+                        this.setState({ deleting: null });
                         this.fetchData();
                     }}/> : ""
                 }
@@ -233,7 +233,7 @@ export class TFStatesTable extends React.Component {
                                     <TableCell>{LastUpdateLabel(l)}</TableCell>
                                     <TableCell>{TableEntryComplianceLabel(l)} {TableEntryComplianceTooltip(l)}</TableCell>
                                     <TableCell align="right">
-                                        <IconButton onClick={() => this.setState({ deleteSelect: l.id })}>
+                                        <IconButton onClick={() => this.setState({ deleting: l.id })}>
                                             <Delete/>
                                         </IconButton>
                                     </TableCell>

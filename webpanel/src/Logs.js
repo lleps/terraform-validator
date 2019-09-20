@@ -13,125 +13,12 @@ import axios from 'axios';
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import Dialog from "@material-ui/core/Dialog";
-import {Link as RouterLink} from "react-router-dom";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import Tooltip from "@material-ui/core/Tooltip";
-import Link from "@material-ui/core/Link";
 import IconButton from "@material-ui/core/IconButton";
-
-function ValidationText(errors, tests) {
-    if (errors === 0) {
-        return <Typography color="primary" component="body1">{tests}/{tests}</Typography>
-    } else {
-        return <Typography color="secondary" component="body1">{tests-errors}/{tests}</Typography>
-    }
-}
-
-function ValidationState(data) {
-    let prevErrors = data.compliance_errors_prev;
-    let prevTests = data.compliance_tests_prev;
-    if (prevTests === 0) {
-        return ValidationText(data.compliance_errors, data.compliance_tests);
-    } else {
-        return (
-            <div>
-                {ValidationText(prevErrors, prevTests)}
-                <TrendingFlat/>
-                {ValidationText(data.compliance_errors, data.compliance_tests)}
-            </div>
-        )
-    }
-}
-
-function Lines(data) {
-    if (data.compliance_tests_prev === 0) {
-        return <div>new</div>
-    }
-
-    return <div>change</div>
-}
-
-export class ValidationLogsTable extends React.Component {
-    state = {
-        logs: []
-    };
-
-    componentDidMount() {
-        axios.get(`http://localhost:8080/logs/json`)
-            .then(res => {
-                const logs = res.data;
-                this.setState({ logs });
-            })
-    }
-
-    render() {
-        if (this.state.logs.length === 0) {
-            return <div align="center"><CircularProgress/></div>
-        }
-
-        return (
-            <React.Fragment>
-                <Title>Latest Validations</Title>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Result</TableCell>
-                            <TableCell align="right" />
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        { this.state.logs
-                            .filter(l => l.kind === "validation")
-                            .map(l => (
-                                <TableRow key={l.id}>
-                                    <TableCell>{l.date_time}</TableCell>
-                                    <TableCell>{ValidationState(l)}</TableCell>
-                                    <TableCell align="right">
-                                        <IconButton onClick={() => this.props.onSelectInfo(l.id)} >
-                                            <Info/>
-                                        </IconButton>
-                                        <IconButton>
-                                            <Delete/>
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                    </TableBody>
-                </Table>
-            </React.Fragment>
-        )
-    }
-}
-
-function FeaturePassing({ passing, errors}) {
-    return <span>
-        <Typography color={passing ? "primary" : "secondary"} component="body1">
-            {passing ? "passing" : "failing"}
-        </Typography>
-        { (errors != null && !passing)
-            ? <Tooltip title={<ul>{errors.map((err) => <li>{err}</li>)}</ul>}><Info/></Tooltip>
-            : ""
-        }
-    </span>;
-}
-
-function FeaturePassingChange({ oldPassing, newPassing, oldErrors, newErrors}) {
-    if (oldPassing === newPassing || oldPassing == null) {
-        return <FeaturePassing passing={newPassing} errors={newErrors}/>
-    }
-
-    return (
-        <span>
-            <FeaturePassing passing={oldPassing} errors={oldErrors}/>
-            <TrendingFlat/>
-            <FeaturePassing passing={newPassing} errors={newErrors}/>
-        </span>
-    )
-}
+import {DeleteDialog} from "./DeleteDialog";
 
 export class LogDetailsDialog extends React.Component {
-
     constructor(props) {
         super(props);
     }
@@ -210,7 +97,6 @@ export class LogDetailsDialog extends React.Component {
                     </div>
                 </DialogContent>
                 <DialogActions>
-                    { false ? this.loadingSpinner() : <div/> }
                     <Button onClick={() => this.props.onClose()} color="primary">
                         Close
                     </Button>
@@ -220,62 +106,173 @@ export class LogDetailsDialog extends React.Component {
     }
 }
 
-export class StateLogsTable extends React.Component {
+function ValidationText(errors, tests) {
+    if (errors === 0) {
+        return <Typography color="primary" component="body1">{tests}/{tests}</Typography>
+    } else {
+        return <Typography color="secondary" component="body1">{tests-errors}/{tests}</Typography>
+    }
+}
+
+function ValidationState(l) {
+    let prevErrors = l.compliance_errors_prev;
+    let prevTests = l.compliance_tests_prev;
+    if (prevTests === 0) {
+        return ValidationText(l.compliance_errors, l.compliance_tests);
+    } else {
+        return (
+            <div>
+                {ValidationText(prevErrors, prevTests)}
+                <TrendingFlat/>
+                {ValidationText(l.compliance_errors, l.compliance_tests)}
+            </div>
+        )
+    }
+}
+
+function LinesChangedLabel(l) {
+    if (l.compliance_tests_prev === 0) {
+        return <div>new</div>
+    }
+
+    return <div>change</div>
+}
+
+function FeaturePassing({ passing, errors}) {
+    return <span>
+        <Typography color={passing ? "primary" : "secondary"} component="body1">
+            {passing ? "passing" : "failing"}
+        </Typography>
+        { (errors != null && !passing)
+            ? <Tooltip title={<ul>{errors.map((err) => <li>{err}</li>)}</ul>}><Info/></Tooltip>
+            : ""
+        }
+    </span>;
+}
+
+function FeaturePassingChange({ oldPassing, newPassing, oldErrors, newErrors}) {
+    if (oldPassing === newPassing || oldPassing == null) {
+        return <FeaturePassing passing={newPassing} errors={newErrors}/>
+    }
+
+    return (
+        <span>
+            <FeaturePassing passing={oldPassing} errors={oldErrors}/>
+            <TrendingFlat/>
+            <FeaturePassing passing={newPassing} errors={newErrors}/>
+        </span>
+    )
+}
+
+function LogTableColumns(kind) {
+    if (kind === "tfstate") {
+        return (
+            <React.Fragment>
+                <TableCell>Date</TableCell>
+                <TableCell>Bucket:Path</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Compliance</TableCell>
+            </React.Fragment>
+        );
+    } else {
+        return (
+            <React.Fragment>
+                <TableCell>Date</TableCell>
+                <TableCell>Compliance</TableCell>
+            </React.Fragment>
+        );
+    }
+}
+
+function LogTableCells(l) {
+    if (l.kind === "tfstate") {
+        return (
+            <React.Fragment>
+                <TableCell>{l.date_time}</TableCell>
+                <TableCell>{l.details}</TableCell>
+                <TableCell>{LinesChangedLabel(l)}</TableCell>
+                <TableCell>{ValidationState(l)}</TableCell>
+            </React.Fragment>
+        );
+    } else {
+        return (
+            <React.Fragment>
+                <TableCell>{l.date_time}</TableCell>
+                <TableCell>{ValidationState(l)}</TableCell>
+            </React.Fragment>
+        );
+    }
+}
+
+export class LogsTable extends React.Component {
     constructor(props) {
         super(props);
     }
 
     state = {
-        logs: []
+        logs: [],
+        updating: false,
+        deleting: null,
     };
 
-    componentDidMount() {
+    fetchData() {
+        this.setState({ updating: true });
         axios.get(`http://localhost:8080/logs/json`)
             .then(res => {
                 const logs = res.data;
                 this.setState({ logs });
+                this.setState({ updating: false });
             })
     }
 
-    render() {
-        if (this.state.logs.length === 0) {
-            return <div align="center"><CircularProgress/></div>
-        }
+    componentDidMount() {
+        this.fetchData();
+    }
 
+    render() {
         return (
             <React.Fragment>
-                <Title>Latest State Changes</Title>
+                {this.state.deleting != null
+                    ? <DeleteDialog
+                        message={"Delete Log Event #" + this.state.deleting + "?"}
+                        deleteUrl={"http://localhost:8080/logs/" + this.state.deleting}
+                        onCancel={() => this.setState({deleting: null})}
+                        onDelete={() => {
+                            this.fetchData();
+                            this.setState({deleting: null});
+                        }}
+                    />
+                    : ""
+                }
+
+                <Title>Latest {this.props.kind === "tfstate" ? "State Changes" : "Validations"}</Title>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Bucket:Path</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Compliance</TableCell>
+                            {LogTableColumns(this.props.kind)}
                             <TableCell align="right"/>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         { this.state.logs
-                            .filter(l => l.kind === "tfstate")
-                            .map(l => (
+                            .filter(l => l.kind === this.props.kind)
+                            .map(l =>
                                 <TableRow key={l.id}>
-                                    <TableCell>{l.date_time}</TableCell>
-                                    <TableCell>{l.details}</TableCell>
-                                    <TableCell>{Lines(l)}</TableCell>
-                                    <TableCell>{ValidationState(l)}</TableCell>
+                                    {LogTableCells(l)}
                                     <TableCell align="right">
                                         <IconButton onClick={() => this.props.onSelectInfo(l.id)} >
                                             <Info/>
                                         </IconButton>
-                                        <IconButton>
+                                        <IconButton onClick={() => this.setState({ deleting: l.id })}>
                                             <Delete/>
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )
+                        }
                     </TableBody>
                 </Table>
+                { this.state.updating ? <div align="center"><CircularProgress/></div> : "" }
             </React.Fragment>
         )
     }
