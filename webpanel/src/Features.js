@@ -16,6 +16,7 @@ import axios from 'axios';
 import {Delete, Edit} from "@material-ui/icons";
 import IconButton from "@material-ui/core/IconButton";
 import DialogTitle from "@material-ui/core/DialogTitle";
+import {DeleteDialog} from "./DeleteDialog";
 
 export function FeatureAddDialog({ onAdd, onCancel }) {
     const [name, setName] = React.useState("");
@@ -171,9 +172,10 @@ export class FeaturesTable extends React.Component {
     state = {
         features: [],
         loadingTable: false,
+        deleteSelect: null,
     };
 
-    componentDidMount() {
+    fetchData() {
         this.setState({ loadingTable: true });
 
         axios.get(`http://localhost:8080/features/json`).then(res => {
@@ -185,9 +187,26 @@ export class FeaturesTable extends React.Component {
         })
     }
 
+    componentDidMount() {
+        this.fetchData();
+    }
+
     render() {
         return  (
             <React.Fragment>
+                { this.state.deleteSelect != null
+                    ? <DeleteDialog
+                        message={"Delete feature '" + this.state.deleteSelect + "'?"}
+                        deleteUrl={"http://localhost:8080/features/" + this.state.deleteSelect}
+                        onDelete={() => {
+                            this.setState({ deleteSelect: null});
+                            this.fetchData()
+                        }}
+                        onCancel={() => this.setState({ deleteSelect: null })}
+                    />
+                    : ""
+                }
+
                 <Title>Features</Title>
                 <Table size="small">
                     <TableHead>
@@ -207,7 +226,9 @@ export class FeaturesTable extends React.Component {
                                         <IconButton onClick={() => this.props.onSelect(f.id)}>
                                             <Edit/>
                                         </IconButton>
-                                        <IconButton><Delete/></IconButton>
+                                        <IconButton onClick={() => this.setState({ deleteSelect: f.id })}>
+                                            <Delete/>
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
