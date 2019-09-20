@@ -11,8 +11,100 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
 import {Delete, Info} from "@material-ui/icons";
 import Tooltip from "@material-ui/core/Tooltip";
+import IconButton from "@material-ui/core/IconButton";
+import Dialog from "@material-ui/core/Dialog";
+import DialogTitle from "@material-ui/core/DialogTitle";
+import DialogContent from "@material-ui/core/DialogContent";
+import TextField from "@material-ui/core/TextField";
+import DialogActions from "@material-ui/core/DialogActions";
+import {DeleteDialog} from "./DeleteDialog";
 
-function ComplianceText(data) {
+export function TFStateAddDialog({ onAdd, onCancel }) {
+    const [bucket, setBucket] = React.useState("");
+    const [path, setPath] = React.useState("");
+    const [inputError, setInputError] = React.useState("");
+
+    function onClickOk() {
+        axios.get(`http://localhost:8080/tfstates/json`).then(res => {
+            if (res.data.findIndex(obj => (obj.path === path && obj.bucket === bucket)) === -1) {
+                axios.post(`http://localhost:8080/tfstates`, {
+                    bucket: bucket,
+                    path: path,
+                }).then(() => {
+                    onAdd();
+                }).catch(error => {
+                    console.log(error);
+                })
+            } else {
+                setInputError("That bucket:path is already registered.");
+            }
+        }).catch(error => {
+            console.log(error);
+        })
+    }
+
+    function handlePathChange(e) {
+        setPath(e.target.value);
+        setInputError("");
+    }
+
+    function handleBucketChange(e) {
+        setBucket(e.target.value);
+        setInputError("");
+    }
+
+    function inputNotEmpty() {
+        return bucket.length > 0 && path.length > 0;
+    }
+
+    return <div>
+        <Dialog open={true} onClose={() => onCancel()}>
+            <DialogTitle>Add TFState</DialogTitle>
+            <DialogContent>
+                <TextField
+                    autoComplete="off"
+                    autoFocus
+                    value={bucket}
+                    margin="dense"
+                    id="bucket"
+                    label="S3 Bucket"
+                    onChange={handleBucketChange}
+                    type="text"
+                    fullWidth
+                />
+                <TextField
+                    autoComplete="off"
+                    value={path}
+                    margin="dense"
+                    id="path"
+                    label="Path to TFState"
+                    onChange={handlePathChange}
+                    error={inputError !== ""}
+                    helperText={inputError}
+                    type="text"
+                    fullWidth
+                />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => onCancel()} color="primary">
+                    Cancel
+                </Button>
+                <Button onClick={() => onClickOk()} color="primary" disabled={!inputNotEmpty() || inputError !== ""}>
+                    Add
+                </Button>
+            </DialogActions>
+        </Dialog>
+    </div>
+}
+
+function LastUpdateLabel(data) {
+    if (data.last_update === "") {
+        return <span>never</span>;
+    }
+    return <span>{data.last_update}</span>;
+}
+
+function TableEntryComplianceLabel(data) {
     if (data.compliance_present === true) {
         if (data.compliance_errors === 0) {
             return <Typography color="primary" component="body1">yes {data.compliance_tests}/{data.compliance_tests}</Typography>
@@ -24,8 +116,7 @@ function ComplianceText(data) {
     }
 }
 
-
-function ComplianceDetails(data) {
+function TableEntryComplianceDetails(data) {
     if (data.compliance_present !== true) {
         return <div/>
     }
@@ -71,12 +162,16 @@ function ComplianceDetails(data) {
     );
 }
 
-function ComplianceTooltip(data) {
+function TableEntryComplianceTooltip(data) {
+    if (data.last_update === "") {
+        return <div/>
+    }
+
     return (
         <Tooltip
             title={
                 <React.Fragment>
-                    {ComplianceDetails(data)}
+                    {TableEntryComplianceDetails(data)}
                 </React.Fragment>
             }>
             <Info/>
@@ -86,26 +181,38 @@ function ComplianceTooltip(data) {
 
 export class TFStatesTable extends React.Component {
     state = {
-        tfstates: []
+        tfstates: [],
+        deleteSelect: null,
+        updating: false
     };
 
-    componentDidMount() {
+    fetchData() {
+        this.setState({ updating: true });
         axios.get(`http://localhost:8080/tfstates/json`)
             .then(res => {
                 const tfstates = res.data;
                 this.setState({ tfstates });
+                this.setState({ updating: false });
             })
     }
 
-
+    componentDidMount() {
+        this.fetchData()
+    }
 
     render() {
-        if (this.state.tfstates.length === 0) {
-            return <div align="center"><CircularProgress/></div>
-        }
-
         return (
             <React.Fragment>
+                { this.state.deleteSelect != null ? <DeleteDialog
+                    deleteUrl={"http://localhost:8080/tfstates/" + this.state.deleteSelect}
+                    message={"Delete TFState #" + this.state.deleteSelect + "?"}
+                    onCancel={() => this.setState({ deleteSelect: null })}
+                    onDelete={() => {
+                        this.setState({ deleteSelect: null });
+                        this.fetchData();
+                    }}/> : ""
+                }
+
                 <Title>Terraform States</Title>
                 <Table size="small">
                     <TableHead>
@@ -123,15 +230,18 @@ export class TFStatesTable extends React.Component {
                                 <TableRow key={l.id}>
                                     <TableCell>{l.bucket}</TableCell>
                                     <TableCell>{l.path}</TableCell>
-                                    <TableCell>{l.last_update}</TableCell>
-                                    <TableCell>{ComplianceText(l)} {ComplianceTooltip(l)}</TableCell>
+                                    <TableCell>{LastUpdateLabel(l)}</TableCell>
+                                    <TableCell>{TableEntryComplianceLabel(l)} {TableEntryComplianceTooltip(l)}</TableCell>
                                     <TableCell align="right">
-                                        <Button><Delete/></Button>
+                                        <IconButton onClick={() => this.setState({ deleteSelect: l.id })}>
+                                            <Delete/>
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
                     </TableBody>
                 </Table>
+                { this.state.updating ? <div align="center"><CircularProgress/></div> : "" }
             </React.Fragment>
         )
     }

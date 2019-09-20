@@ -6,7 +6,7 @@ import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
 import {LogDetailsDialog, StateLogsTable, ValidationLogsTable} from "./Logs";
 import {FeatureAddDialog, FeatureEditDialog, FeaturesTable} from "./Features";
-import {TFStatesTable} from "./TFStates";
+import {TFStateAddDialog, TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
 import FloatingActionButtons from "./Fab";
@@ -97,17 +97,27 @@ function LogDetails(props) {
 
 //
 
-function TFStates() {
+function TFStateAdd(props) {
+    return (
+        <TFStateAddDialog
+            onAdd={() => pushRefresh(props.history, "/tfstates")}
+            onCancel={() => props.history.push("/tfstates")}
+        />
+    );
+}
+
+function TFStates(props) {
     const classes = useStyles();
 
     return (
         <div>
+            <Route path={`${props.match.url}/add`} component={TFStateAdd} />
             <Grid item xs={12}>
                 <Paper className={classes.paper}>
                     <TFStatesTable/>
                 </Paper>
             </Grid>
-            <FloatingActionButtons/>
+            <FloatingActionButtons onClick={() => props.history.push("/tfstates/add")} />
         </div>
     );
 }

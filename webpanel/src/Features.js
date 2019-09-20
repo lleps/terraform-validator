@@ -24,15 +24,16 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
     function onClickOk() {
         axios.get(`http://localhost:8080/features/json`).then(res => {
             if (res.data.findIndex(obj => obj.id === name) === -1) {
+                if (!nameIsValid(name)) {
+                    setInputError("Invalid name.");
+                    return;
+                }
+
                 axios.post(`http://localhost:8080/features`, {
                     name: name,
                     source: "Feature: " + name + "\n\n",
                 }).then(() => {
-                    if (!nameIsValid(name)) {
-                        setInputError("Invalid name.");
-                    } else {
-                        onAdd(name);
-                    }
+                    onAdd(name);
                 }).catch(error => {
                     console.log(error);
                 })
@@ -59,8 +60,8 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
     }
 
     return <div>
-        <Dialog open={true} >
-            <DialogTitle> Add Feature</DialogTitle>
+        <Dialog open={true} onClose={() => onCancel()}>
+            <DialogTitle>Add Feature</DialogTitle>
             <DialogContent>
                 <TextField
                     autoComplete="off"
@@ -141,6 +142,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
             maxWidth="md"
             open={true}
             onClose={() => onCancel()} aria-labelledby="form-dialog-title">
+            <DialogTitle>Edit Feature</DialogTitle>
             <DialogContent>
                 {body}
             </DialogContent>
