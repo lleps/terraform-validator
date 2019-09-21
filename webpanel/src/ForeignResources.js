@@ -17,7 +17,7 @@ export class ForeignResourcesTable extends React.Component {
     };
 
     componentDidMount() {
-        axios.get(`http://localhost:8080/foreignresources/json`)
+        axios.get(`/foreignresources/json`)
             .then(res => {
                 const foreignresources = res.data;
                 this.setState({ foreignresources });
@@ -54,7 +54,6 @@ export class ForeignResourcesTable extends React.Component {
                     </TableBody>
                 </Table>
             </React.Fragment>
-
         )
     }
 }

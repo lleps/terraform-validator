@@ -29,7 +29,7 @@ export class LogDetailsDialog extends React.Component {
     };
 
     componentDidMount() {
-        axios.get("http://localhost:8080/logs/json/" + this.props.id)
+        axios.get("/logs/json/" + this.props.id)
             .then(res => {
                 const details = res.data;
                 this.setState({ details: details, diffHtml: details.state_diff_html });
@@ -217,7 +217,7 @@ export class LogsTable extends React.Component {
 
     fetchData() {
         this.setState({ updating: true });
-        axios.get(`http://localhost:8080/logs/json`)
+        axios.get(`/logs/json`)
             .then(res => {
                 const logs = res.data;
                 this.setState({ logs });
@@ -235,7 +235,7 @@ export class LogsTable extends React.Component {
                 {this.state.deleting != null
                     ? <DeleteDialog
                         message={"Delete Log Event #" + this.state.deleting + "?"}
-                        deleteUrl={"http://localhost:8080/logs/" + this.state.deleting}
+                        deleteUrl={"/logs/" + this.state.deleting}
                         onCancel={() => this.setState({deleting: null})}
                         onDelete={() => {
                             this.fetchData();

@@ -23,14 +23,14 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
     const [inputError, setInputError] = React.useState("");
 
     function onClickOk() {
-        axios.get(`http://localhost:8080/features/json`).then(res => {
+        axios.get(`/features/json`).then(res => {
             if (res.data.findIndex(obj => obj.id === name) === -1) {
                 if (!nameIsValid(name)) {
                     setInputError("Invalid name.");
                     return;
                 }
 
-                axios.post(`http://localhost:8080/features`, {
+                axios.post(`/features`, {
                     name: name,
                     source: "Feature: " + name + "\n\n",
                 }).then(() => {
@@ -96,7 +96,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [saving, setSaving] = React.useState(false);
 
     React.useEffect(() => {
-        axios.get("http://localhost:8080/features/json/" + id)
+        axios.get("/features/json/" + id)
             .then(res => {
                 setSource(res.data.source);
                 setLoading(false);
@@ -106,7 +106,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
 
     function save() {
         setSaving(true);
-        axios.post(`http://localhost:8080/features`, {
+        axios.post(`/features`, {
             name: id,
             source: source,
         }).then(() => {
@@ -178,7 +178,7 @@ export class FeaturesTable extends React.Component {
     fetchData() {
         this.setState({ updating: true });
 
-        axios.get(`http://localhost:8080/features/json`).then(res => {
+        axios.get(`/features/json`).then(res => {
             const features = res.data;
             this.setState({ features: features, updating: false });
         }).catch(error => {
@@ -197,7 +197,7 @@ export class FeaturesTable extends React.Component {
                 { this.state.deleting != null
                     ? <DeleteDialog
                         message={"Delete feature '" + this.state.deleting + "'?"}
-                        deleteUrl={"http://localhost:8080/features/" + this.state.deleting}
+                        deleteUrl={"/features/" + this.state.deleting}
                         onDelete={() => {
                             this.setState({ deleting: null});
                             this.fetchData()

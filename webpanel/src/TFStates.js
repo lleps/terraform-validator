@@ -25,9 +25,9 @@ export function TFStateAddDialog({ onAdd, onCancel }) {
     const [inputError, setInputError] = React.useState("");
 
     function onClickOk() {
-        axios.get(`http://localhost:8080/tfstates/json`).then(res => {
+        axios.get(`/tfstates/json`).then(res => {
             if (res.data.findIndex(obj => (obj.path === path && obj.bucket === bucket)) === -1) {
-                axios.post(`http://localhost:8080/tfstates`, {
+                axios.post(`/tfstates`, {
                     bucket: bucket,
                     path: path,
                 }).then(() => {
@@ -188,7 +188,7 @@ export class TFStatesTable extends React.Component {
 
     fetchData() {
         this.setState({ updating: true });
-        axios.get(`http://localhost:8080/tfstates/json`)
+        axios.get(`/tfstates/json`)
             .then(res => {
                 const tfstates = res.data;
                 this.setState({ tfstates });
@@ -204,7 +204,7 @@ export class TFStatesTable extends React.Component {
         return (
             <React.Fragment>
                 { this.state.deleting != null ? <DeleteDialog
-                    deleteUrl={"http://localhost:8080/tfstates/" + this.state.deleting}
+                    deleteUrl={"/tfstates/" + this.state.deleting}
                     message={"Delete TFState #" + this.state.deleting + "?"}
                     onCancel={() => this.setState({ deleting: null })}
                     onDelete={() => {

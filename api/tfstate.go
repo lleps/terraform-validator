@@ -15,7 +15,8 @@ type TFState struct {
 	Bucket, Path     string
 	State            string // the current state (in json)
 	ComplianceResult string // the output for the compliance tool
-	LastUpdate       string // when was updated. "never" = not checked yet.
+	LastUpdate       string // when was updated. "never" = not checked yet. Use to check for s3 changes?
+	S3LastChange     string // the last registered timestamp s3 bucket
 }
 
 // dbObject methods
