@@ -5,11 +5,8 @@ import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
 import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
-import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
-import {Info} from "@material-ui/icons";
-import Tooltip from "@material-ui/core/Tooltip";
 
 export class ForeignResourcesTable extends React.Component {
     state = {

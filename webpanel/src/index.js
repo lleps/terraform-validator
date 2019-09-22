@@ -5,7 +5,12 @@ import App from './App';
 import * as serviceWorker from './serviceWorker';
 import axios from 'axios';
 
-axios.defaults.baseURL = 'http://localhost:8080';
+// configure custom axios url
+let proto = window.location.protocol;
+let host = window.location.hostname;
+axios.defaults.baseURL = proto + "//" + host + ":8080";
+
+// react render
 ReactDOM.render(<App />, document.getElementById('root'));
 
 // If you want your app to work offline and load faster, you can change

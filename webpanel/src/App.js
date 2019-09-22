@@ -97,8 +97,6 @@ function LogDetails(props) {
     );
 }
 
-//
-
 function TFStateAdd(props) {
     return (
         <TFStateAddDialog
