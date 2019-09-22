@@ -12,11 +12,12 @@ RUN  apt-get update && \
      pip uninstall -y radish radish-bdd && \
      pip install radish radish-bdd && \
      rm -rf /var/lib/apt/lists/* && \
-     mkdir -p /app && \
-     mkdir -p /app/features
-
-ADD server /app
-ADD features/* /app/features/
+     mkdir -p /app 
+     
+#Adding API binary to app folder
+ADD api/api /app
+ADD api/example.tf /app
 WORKDIR /app
+RUN terraform init
+CMD ["/app/api"]
 
-CMD ["/app/server"]
