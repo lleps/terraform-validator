@@ -123,11 +123,6 @@ func runComplianceTool(fileContent []byte) (string, string, error) {
 
 	var complianceToolInput []byte
 
-	// TODO: this conversion.. should be here? I guess in terraform.go,
-	//  something like asTerraformJson(content []byte)... "asTerraformJson ensure the content is in terraform json format."
-	//  also.. this will fail for terraform states, since they're
-	//  json-like, but are not directly parseable...
-
 	// in case the content is not already a json (doesn't starts with "{"), may be in
 	// tf bin format (like plan.out or terraform.tfstate). Try to convert it to json.
 	if fileContent[0] != '{' {

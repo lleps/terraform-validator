@@ -22,11 +22,7 @@ type database struct {
 }
 
 // newDynamoDB creates a DynamoDB instance using the default aws authentication method.
-func newDynamoDB(tablePrefix string) *database {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
+func newDynamoDB(sess *session.Session, tablePrefix string) *database {
 	return &database{dynamodb.New(sess), tablePrefix}
 }
 
@@ -35,7 +31,7 @@ func (db *database) tableFor(name string) string {
 	return db.tablePrefix + "_" + name
 }
 
-// initTable creates tableName on the given database session if it does not exists.
+// initTable creates tableName on the given database if it does not exists.
 func (db *database) initTable(tableName string) error {
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{

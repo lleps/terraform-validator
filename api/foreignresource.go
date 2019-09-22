@@ -82,8 +82,13 @@ func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	return result, err
 }
 
-func (db *database) insertOrUpdateForeignResource(resource *ForeignResource) error {
-	return db.insertOrUpdateGeneric(db.tableFor(foreignResourcesTable), resource)
+func (db *database) insertForeignResource(element *ForeignResource) error {
+	freeId, err := db.nextFreeForeignResourceId()
+	if err != nil {
+		return err
+	}
+	element.Id = freeId
+	return db.insertOrUpdateGeneric(db.tableFor(foreignResourcesTable), element)
 }
 
 func (db *database) removeForeignResource(id string) error {

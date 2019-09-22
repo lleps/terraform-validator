@@ -189,8 +189,13 @@ func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
 	return result, err
 }
 
-func (db *database) insertOrUpdateValidationLog(validationLog *ValidationLog) error {
-	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), validationLog)
+func (db *database) insertValidationLog(element *ValidationLog) error {
+	freeId, err := db.nextFreeValidationLogId()
+	if err != nil {
+		return err
+	}
+	element.Id = freeId
+	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), element)
 }
 
 func (db *database) removeValidationLog(id string) error {

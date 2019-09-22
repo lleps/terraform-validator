@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -22,11 +21,18 @@ var (
 	timestampFormat  = time.Stamp
 )
 
+// TODO: How to handle sessions properly? app-level? Used in dynamo,s3,pulling.
+
 func main() {
 	flag.Parse()
 
-	log.Printf("Init DynamoDB table '%s'...", *dynamoPrefixFlag)
-	db = initDB(*dynamoPrefixFlag)
+	log.Println("Init aws session... (using shared config)")
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	log.Printf("Init DynamoDB at prefix '%s_*'...", *dynamoPrefixFlag)
+	db = initDB(sess, *dynamoPrefixFlag)
 
 	log.Println("Sync feature files from DB...")
 	if err := syncFeaturesFolderFromDB(db); err != nil {
@@ -34,8 +40,8 @@ func main() {
 	}
 
 	log.Printf("Init state monitoring...")
-	initStateChangeMonitoring()
-	initAccountResourcesMonitoring()
+	initStateChangeMonitoring(sess)
+	initAccountResourcesMonitoring(sess)
 
 	log.Printf("Listening on '%s'...", *listenFlag)
 	router := initEndpoints()
@@ -57,8 +63,8 @@ func (_ LogWriter) Write(bytes []byte) (n int, err error) {
 	return
 }
 
-func initDB(prefix string) *database {
-	result := newDynamoDB(prefix)
+func initDB(sess *session.Session, prefix string) *database {
+	result := newDynamoDB(sess, prefix)
 	if err := result.initTables(complianceFeatureTable, validationLogTable, tfStateTable, foreignResourcesTable); err != nil {
 		log.Fatalf("Can't make database table: %v", err)
 	}
@@ -67,8 +73,8 @@ func initDB(prefix string) *database {
 
 // initAccountResourcesMonitoring starts a goroutine that periodically checks if there are
 // resources in the account that don't belong to any registered tfstate, and reports them.
-func initAccountResourcesMonitoring() {
-	ticker := time.NewTicker(10 * time.Second)
+func initAccountResourcesMonitoring(sess *session.Session) {
+	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
 			// Load all tfstates and current foreign resources.
@@ -85,15 +91,6 @@ func initAccountResourcesMonitoring() {
 				continue
 			}
 
-			// Discover all account resources
-			sess, err := session.NewSession(&aws.Config{
-				Region: aws.String("us-east-1")},
-			)
-			if err != nil {
-				log.Printf("Can't init aws session: %v", err)
-				continue
-			}
-
 			// This is the slow part.
 			// Should do some kind of parallelism.
 			resources, err := ListAllResources(sess)
@@ -102,7 +99,7 @@ func initAccountResourcesMonitoring() {
 				continue
 			}
 
-			// Ensure all resources are in at least any tfstate.
+			// Ensure all resources are in at least one tfstate.
 			findForeignResourceEntry := func(resourceId string) *ForeignResource {
 				for _, fr := range foreignResources {
 					if fr.ResourceId == resourceId {
@@ -129,27 +126,18 @@ func initAccountResourcesMonitoring() {
 				resourceBucket := findResourceInBuckets(r.ID())
 				if existingFr == nil {
 					if resourceBucket == nil {
-						id, err := db.nextFreeForeignResourceId()
-						if err != nil {
-							log.Printf("Can't get free fr id: %v", err)
-							continue
-						}
 						fr := &ForeignResource{
-							Id:                  id,
 							DiscoveredTimestamp: time.Now().Format(timestampFormat),
 							ResourceType:        "ec2-instance",
 							ResourceId:          r.ID(),
 							ResourceDetails:     "type: ec2-micro\nami: abcde-123456",
 							IsException:         false,
 						}
-						if err := db.insertOrUpdateForeignResource(fr); err != nil {
+						if err := db.insertForeignResource(fr); err != nil {
 							log.Printf("Can't insert fr: %v", err)
 							continue
 						}
-						// TODO: log entry corresponding to this discovery? or
-						//  bulk log entries with many resources using some kind
-						//  of counter?
-						log.Printf("New foreign resource registered: '%s' #%s", r.ID(), id)
+						log.Printf("New foreign resource registered: '%s' #%s", r.ID(), fr.Id)
 					}
 				} else {
 					// The resource is not new. Gotta check if the resource is still foreign.
@@ -172,7 +160,7 @@ func initAccountResourcesMonitoring() {
 
 // initStateChangeMonitoring starts a goroutine that periodically checks if
 // tfstates changed, and if they did runs the compliance tool and logs results.
-func initStateChangeMonitoring() {
+func initStateChangeMonitoring(sess *session.Session) {
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
@@ -183,7 +171,7 @@ func initStateChangeMonitoring() {
 			}
 
 			for _, obj := range objs {
-				changed, logEntry, err := checkTFState(obj)
+				changed, logEntry, err := checkTFState(sess, obj)
 				if err != nil {
 					log.Printf("can't check TFState for state #%s (%s:%s): %v", obj.Id, obj.Bucket, obj.Path, err)
 					continue
@@ -279,21 +267,11 @@ func initEndpoints() *mux.Router {
 			bucket := data["bucket"]
 			path := data["path"]
 
-			// TODO: instead of adding this raw, should
-			//  add this filled. Like, get the object
-			//  from S3, run compliance on it, and log
-			//  results.
 			if bucket == "" || path == "" {
 				return fmt.Errorf("'bucket' or 'path' not given")
 			}
 
-			id, err := db.nextFreeTFStateId()
-			if err != nil {
-				return fmt.Errorf("can't get id: %v", err)
-			}
-
-			return db.insertOrUpdateTFState(&TFState{
-				Id:     id,
+			return db.insertTFState(&TFState{
 				Bucket: bucket,
 				Path:   path,
 			})
@@ -322,38 +300,37 @@ func initEndpoints() *mux.Router {
 }
 
 // checkTFState checks if the given tfstate changed in S3.
-// if it did, runs the compliance and adds a new log entry.
-func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err error) {
-	fileBytes, err := getFileFromS3(state.Bucket, state.Path)
+// if it did, runs the compliance tool and adds a new log entry.
+func checkTFState(sess *session.Session, state *TFState) (changed bool, logEntry *ValidationLog, err error) {
+	// Fetch bucket item if changed.
+	bucket := state.Bucket
+	path := state.Path
+	changed, itemBytes, lastModification, err := getItemFromS3IfChanged(sess, bucket, path, state.S3LastModification)
 	if err != nil {
 		return false, nil, fmt.Errorf("can't get tfstate from s3: %v", err)
 	}
 
-	actualState, err := convertTerraformBinToJson(fileBytes)
+	if !changed {
+		return false, nil, nil
+	}
+
+	// Assume changed (item last modification changed).
+	// Convert to json to run compliance.
+	changed = true
+	actualState, err := convertTerraformBinToJson(itemBytes)
 	if err != nil {
 		return false, nil, fmt.Errorf("can't convert to json: %v", err)
 	}
 
-	// TODO: if features changed, should run too.
-	if actualState == state.State {
-		return false, nil, nil
-	}
-
-	changed = true
+	// Run compliance
 	_, output, err := runComplianceTool([]byte(actualState))
 	if err != nil {
 		return true, nil, fmt.Errorf("can't run compliance tool: %v", err)
 	}
 
-	freeId, err := db.nextFreeValidationLogId()
-	if err != nil {
-		return true, nil, fmt.Errorf("can't get an id for a validationLog: %v", err)
-	}
-
 	// Register the log entry
 	now := time.Now().Format(timestampFormat)
 	logEntry = &ValidationLog{
-		Id:            freeId,
 		Kind:          logKindTFState,
 		DateTime:      now,
 		InputJson:     actualState,
@@ -362,7 +339,7 @@ func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err er
 		PrevInputJson: state.State,
 		PrevOutput:    state.ComplianceResult,
 	}
-	if err := db.insertOrUpdateValidationLog(logEntry); err != nil {
+	if err := db.insertValidationLog(logEntry); err != nil {
 		return true, nil, fmt.Errorf("can't insert logEntry on DB: %v", err)
 	}
 
@@ -370,7 +347,8 @@ func checkTFState(state *TFState) (changed bool, logEntry *ValidationLog, err er
 	state.LastUpdate = now
 	state.State = actualState
 	state.ComplianceResult = output
-	if err := db.insertOrUpdateTFState(state); err != nil {
+	state.S3LastModification = lastModification
+	if err := db.updateTFState(state); err != nil {
 		return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
 	}
 	return
@@ -395,20 +373,14 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}
 
-	id, err := db.nextFreeValidationLogId()
-	if err != nil {
-		return "", 0, fmt.Errorf("can't get an id: %v", err)
-	}
-
 	logEntry := ValidationLog{
-		Id:        id,
 		Kind:      logKindValidation,
 		DateTime:  time.Now().Format(timestampFormat),
 		InputJson: complianceInput,
 		Output:    complianceOutput,
 	}
 
-	if err := db.insertOrUpdateValidationLog(&logEntry); err != nil {
+	if err := db.insertValidationLog(&logEntry); err != nil {
 		return "", 0, fmt.Errorf("can't insert logEntry: %v", err)
 	}
 
