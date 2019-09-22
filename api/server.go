@@ -17,7 +17,6 @@ import (
 var (
 	listenFlag       = flag.String("listen", ":8080", "On which address to listen")
 	dynamoPrefixFlag = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
-	db               *database // TODO remove this ugly global
 	timestampFormat  = time.Stamp
 )
 
@@ -32,14 +31,14 @@ func main() {
 	}))
 
 	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
-	db = initDB(sess, *dynamoPrefixFlag)
+	db := initDB(sess, *dynamoPrefixFlag)
 
 	log.Printf("Init state and resource monitoring tickers...")
-	initStateChangeMonitoring(sess)
-	initAccountResourcesMonitoring(sess)
+	initStateChangeMonitoring(sess, db)
+	initAccountResourcesMonitoring(sess, db)
 
 	log.Printf("Listening on '%s'...", *listenFlag)
-	router := initEndpoints()
+	router := initEndpoints(db)
 
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
 	originsOk := handlers.AllowedOrigins([]string{"*"})
@@ -68,7 +67,7 @@ func initDB(sess *session.Session, prefix string) *database {
 
 // initAccountResourcesMonitoring starts a goroutine that periodically checks if there are
 // resources in the account that don't belong to any registered tfstate, and reports them.
-func initAccountResourcesMonitoring(sess *session.Session) {
+func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
@@ -155,7 +154,7 @@ func initAccountResourcesMonitoring(sess *session.Session) {
 
 // initStateChangeMonitoring starts a goroutine that periodically checks if
 // tfstates changed, and if they did runs the compliance tool and logs results.
-func initStateChangeMonitoring(sess *session.Session) {
+func initStateChangeMonitoring(sess *session.Session, db *database) {
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for range ticker.C {
@@ -166,7 +165,7 @@ func initStateChangeMonitoring(sess *session.Session) {
 			}
 
 			for _, obj := range objs {
-				changed, logEntry, err := checkTFState(sess, obj)
+				changed, logEntry, err := checkTFState(sess, db, obj)
 				if err != nil {
 					log.Printf("can't check TFState for state #%s (%s:%s): %v", obj.Id, obj.Bucket, obj.Path, err)
 					continue
@@ -180,9 +179,9 @@ func initStateChangeMonitoring(sess *session.Session) {
 	}()
 }
 
-func initEndpoints() *mux.Router {
+func initEndpoints(db *database) *mux.Router {
 	r := mux.NewRouter()
-	registerEndpoint(r, "/validate", validateHandler, "POST")
+	registerEndpoint(r, db, "/validate", validateHandler, "POST")
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router:   r,
 		endpoint: "/features",
@@ -295,7 +294,7 @@ func initEndpoints() *mux.Router {
 
 // checkTFState checks if the given tfstate changed in S3.
 // if it did, runs the compliance tool and adds a new log entry.
-func checkTFState(sess *session.Session, state *TFState) (changed bool, logEntry *ValidationLog, err error) {
+func checkTFState(sess *session.Session, db *database, state *TFState) (changed bool, logEntry *ValidationLog, err error) {
 	// Fetch bucket item if changed.
 	bucket := state.Bucket
 	path := state.Path
@@ -351,7 +350,7 @@ func checkTFState(sess *session.Session, state *TFState) (changed bool, logEntry
 // validateHandler takes a base64 string in the body with the plan file content
 // or terraform json, run the tfComplianceBin tool against it, and responds
 // the tool output as a response.
-func validateHandler(body string, _ map[string]string) (string, int, error) {
+func validateHandler(db *database, body string, _ map[string]string) (string, int, error) {
 	var base64data string
 	if err := json.Unmarshal([]byte(body), &base64data); err != nil {
 		return "", 0, fmt.Errorf("can't decode into json string: %v", err)
@@ -362,7 +361,7 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
-	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes, make([]*ComplianceFeature, 0))
+	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes, make([]*ComplianceFeature, 0)) // TODO make properly
 	if err != nil {
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}

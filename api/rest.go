@@ -19,8 +19,9 @@ import (
 // proper error handling and logging.
 func registerEndpoint(
 	router *mux.Router,
+	db *database,
 	endpoint string,
-	handler func(string, map[string]string) (string, int, error),
+	handler func(*database, string, map[string]string) (string, int, error),
 	method string,
 ) {
 	router.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func registerEndpoint(
 		}
 
 		// execute the handler
-		response, code, err := handler(string(bodyBytes), vars)
+		response, code, err := handler(db, string(bodyBytes), vars)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = fmt.Fprint(w, err.Error())
@@ -96,7 +97,7 @@ type collectionEndpointBuilder struct {
 func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder) {
 	// GET /endpoint and GET /endpoint/{id}
 	if builder.dbFetchFunc != nil {
-		allHandler := func(body string, _ map[string]string) (string, int, error) {
+		allHandler := func(_ *database, body string, _ map[string]string) (string, int, error) {
 			objs, err := builder.dbFetchFunc(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
@@ -109,7 +110,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			}
 			return sb.String(), http.StatusOK, nil
 		}
-		detailsHandler := func(body string, urlVars map[string]string) (string, int, error) {
+		detailsHandler := func(_ *database, body string, urlVars map[string]string) (string, int, error) {
 			id := urlVars["id"]
 			objs, err := builder.dbFetchFunc(db)
 			if err != nil {
@@ -122,7 +123,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			}
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
-		allHandlerJSON := func(body string, _ map[string]string) (string, int, error) {
+		allHandlerJSON := func(_ *database, body string, _ map[string]string) (string, int, error) {
 			objs, err := builder.dbFetchFunc(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
@@ -142,7 +143,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 
 			return string(asJSON), http.StatusOK, nil
 		}
-		detailsHandlerJSON := func(body string, urlVars map[string]string) (string, int, error) {
+		detailsHandlerJSON := func(_ *database, body string, urlVars map[string]string) (string, int, error) {
 			id := urlVars["id"]
 			objs, err := builder.dbFetchFunc(db)
 			if err != nil {
@@ -163,15 +164,15 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			}
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
-		registerEndpoint(builder.router, builder.endpoint+"/json", allHandlerJSON, "GET")
-		registerEndpoint(builder.router, builder.endpoint+"/json/{id}", detailsHandlerJSON, "GET")
-		registerEndpoint(builder.router, builder.endpoint, allHandler, "GET")
-		registerEndpoint(builder.router, builder.endpoint+"/{id}", detailsHandler, "GET")
+		registerEndpoint(builder.router, db, builder.endpoint+"/json", allHandlerJSON, "GET")
+		registerEndpoint(builder.router, db, builder.endpoint+"/json/{id}", detailsHandlerJSON, "GET")
+		registerEndpoint(builder.router, db, builder.endpoint, allHandler, "GET")
+		registerEndpoint(builder.router, db, builder.endpoint+"/{id}", detailsHandler, "GET")
 	}
 
 	// DELETE /endpoint/{id}
 	if builder.dbRemoveFunc != nil {
-		handler := func(body string, vars map[string]string) (string, int, error) {
+		handler := func(_ *database, body string, vars map[string]string) (string, int, error) {
 			id := vars["id"]
 			objs, err := builder.dbFetchFunc(db)
 			if err != nil {
@@ -191,17 +192,17 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
-		registerEndpoint(builder.router, builder.endpoint+"/{id}", handler, "DELETE")
+		registerEndpoint(builder.router, db, builder.endpoint+"/{id}", handler, "DELETE")
 	}
 
 	// POST /endpoint
 	if builder.dbInsertFunc != nil {
-		handler := func(body string, _ map[string]string) (string, int, error) {
+		handler := func(_ *database, body string, _ map[string]string) (string, int, error) {
 			if err := builder.dbInsertFunc(db, body); err != nil {
 				return "", 0, fmt.Errorf("POST: can't insert object: %v", err)
 			}
 			return "", http.StatusOK, nil
 		}
-		registerEndpoint(builder.router, builder.endpoint, handler, "POST")
+		registerEndpoint(builder.router, db, builder.endpoint, handler, "POST")
 	}
 }
