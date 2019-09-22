@@ -7,8 +7,9 @@ import (
 
 // ComplianceFeature stores a feature to test terraform code against.
 type ComplianceFeature struct {
-	Id            string // name of the feature
-	FeatureSource string // gherkin source code of the feature
+	Id            string   // name of the feature
+	FeatureSource string   // gherkin source code of the feature
+	Tags          []string // to specify which states this feature affects
 }
 
 // restObject methods
@@ -28,6 +29,7 @@ func (f *ComplianceFeature) details() string {
 func (f *ComplianceFeature) writeTopLevelFields(dst map[string]interface{}) {
 	dst["enabled"] = true
 	dst["source"] = f.FeatureSource
+	dst["tags"] = f.Tags
 }
 
 func (f *ComplianceFeature) writeDetailedFields(dst map[string]interface{}) {
@@ -38,7 +40,7 @@ func (f *ComplianceFeature) writeDetailedFields(dst map[string]interface{}) {
 
 const complianceFeatureTable = "features"
 
-var complianceFeatureAttributes = []string{"FeatureSource"}
+var complianceFeatureAttributes = []string{"FeatureSource", "Tags"}
 
 func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	var result []*ComplianceFeature

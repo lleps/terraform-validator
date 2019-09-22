@@ -11,12 +11,13 @@ import (
 // TFState defines a remote TF state that must be checked for compliance
 // periodically.
 type TFState struct {
-	Id                 string // maybe id should be 1,2,3,4 etc. to easily remove them.
-	Bucket, Path       string
-	State              string // the current state (in json)
-	ComplianceResult   string // the output for the compliance tool
-	LastUpdate         string // the last compliance check. "never" = not checked yet.
-	S3LastModification string // the s3 item last modification (to avoid pulling the state when it doesn't change)
+	Id                 string   // maybe id should be 1,2,3,4 etc. to easily remove them.
+	Bucket, Path       string   // s3 bucket and item
+	State              string   // the current state (in json)
+	ComplianceResult   string   // the output for the compliance tool
+	LastUpdate         string   // the last compliance check. "never" = not checked yet.
+	S3LastModification string   // the s3 item last modification (to avoid pulling the state when it doesn't change)
+	Tags               []string // to specify by which features this state should be checked
 }
 
 // dbObject methods
@@ -118,7 +119,7 @@ func (state *TFState) writeDetailedFields(dst map[string]interface{}) {
 
 const tfStateTable = "tfstates"
 
-var tfStateAttributes = []string{"Bucket", "Path", "State", "ComplianceResult", "LastUpdate", "S3LastModification"}
+var tfStateAttributes = []string{"Bucket", "Path", "State", "ComplianceResult", "LastUpdate", "S3LastModification", "Tags"}
 
 func (db *database) loadAllTFStates() ([]*TFState, error) {
 	var result []*TFState

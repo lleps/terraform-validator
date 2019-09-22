@@ -216,7 +216,7 @@ func initEndpoints(db *database) *mux.Router {
 				return fmt.Errorf("invalid feature name: '%s'", name)
 			}
 
-			return db.insertOrUpdateFeature(&ComplianceFeature{name, source})
+			return db.insertOrUpdateFeature(&ComplianceFeature{name, source, []string{"sometag", "babab"}})
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
@@ -316,7 +316,7 @@ func checkTFState(sess *session.Session, db *database, state *TFState) (changed 
 	}
 
 	// Run compliance
-	_, output, err := runComplianceTool([]byte(actualState), make([]*ComplianceFeature, 0)) // TODO: make properly
+	_, output, err := runComplianceToolForTags(db, []byte(actualState), state.Tags)
 	if err != nil {
 		return true, nil, fmt.Errorf("can't run compliance tool: %v", err)
 	}
@@ -361,7 +361,7 @@ func validateHandler(db *database, body string, _ map[string]string) (string, in
 		return "", 0, err
 	}
 
-	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes, make([]*ComplianceFeature, 0)) // TODO make properly
+	complianceInput, complianceOutput, err := runComplianceToolForTags(db, planFileBytes, []string{"validation"})
 	if err != nil {
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}

@@ -109,6 +109,47 @@ func parseComplianceOutput(output string) (complianceOutput, error) {
 	return result, nil
 }
 
+// getFeaturesForTags returns only the features that
+// contains any of the given tags.
+func getFeaturesContainingTags(features []*ComplianceFeature, tags []string) []*ComplianceFeature {
+	hasElementInCommon := func(slice1 []string, slice2 []string) bool {
+		for _, s1 := range slice1 {
+			for _, s2 := range slice2 {
+				if s1 == s2 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	result := make([]*ComplianceFeature, 0)
+	if tags != nil {
+		for _, f := range features {
+			if f.Tags == nil {
+				continue
+			}
+
+			if hasElementInCommon(f.Tags, tags) {
+				result = append(result, f)
+			}
+		}
+	}
+	return result
+}
+
+// runComplianceToolForTags runs the compliance tool using only
+// the features from db that contains any of the given tags.
+func runComplianceToolForTags(db *database, fileContent []byte, tags []string) (string, string, error) {
+	allFeatures, err := db.loadAllFeatures()
+	if err != nil {
+		return "", "", fmt.Errorf("can't get features from db: %v", err)
+	}
+
+	features := getFeaturesContainingTags(allFeatures, tags)
+	return runComplianceTool(fileContent, features)
+}
+
 // runComplianceTool runs the tfComplianceBin against the given file content.
 // fileContent may be either a json string, or a terraform binary file format.
 // Returns the input and output of the tool if successful.
