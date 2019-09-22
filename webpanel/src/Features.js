@@ -94,11 +94,15 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [source, setSource] = React.useState("");
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
+    const [tags, setTags] = React.useState("default");
 
     React.useEffect(() => {
         axios.get("/features/json/" + id)
             .then(res => {
                 setSource(res.data.source);
+                if (res.data.tags != null) {
+                    setTags(res.data.tags.join(","));
+                }
                 setLoading(false);
             })
             .catch(err => console.log("error getting details: " + err));
@@ -109,6 +113,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         axios.post(`/features`, {
             name: id,
             source: source,
+            tags: tags.split(",")
         }).then(() => {
             setSaving(false);
             onSave();
@@ -121,20 +126,36 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     if (loading) {
         body = <div align={"center"}><CircularProgress/></div>;
     } else {
-        body = <TextField
-            id="filled-full-width"
-            multiline
-            label={id}
-            rowsMax="20"
-            inputProps={{
-                style: {fontSize: 15, fontFamily: "Monospace" }
-            }}
-            value={source}
-            onChange={e => setSource(e.target.value)}
-            fullWidth
-            margin="normal"
-            variant="filled"
-        />
+        body = <div>
+            <TextField
+                id="tags"
+                label={"Tags"}
+                value={tags}
+                autoComplete={"off"}
+                onChange={e => setTags(e.target.value)}
+                margin="normal"
+            />
+            <TextField
+                id="filled-full-width"
+                multiline
+                label={"Source"}
+                rowsMax="60"
+                autoComplete={"off"}
+                inputProps={{
+                    style: {
+                        padding: 15,
+                        fontSize: 15,
+                        fontFamily: "Monospace",
+                        color: "#ECEFF1",
+                        background: "#353535",
+                    }
+                }}
+                value={source}
+                onChange={e => setSource(e.target.value)}
+                fullWidth
+                margin="normal"
+            />
+        </div>
     }
 
     return (
@@ -143,7 +164,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
             maxWidth="md"
             open={true}
             onClose={() => onCancel()} aria-labelledby="form-dialog-title">
-            <DialogTitle>Edit Feature</DialogTitle>
+            <DialogTitle>Edit {id}</DialogTitle>
             <DialogContent>
                 {body}
             </DialogContent>

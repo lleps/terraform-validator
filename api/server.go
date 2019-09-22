@@ -200,23 +200,25 @@ func initEndpoints(db *database) *mux.Router {
 			return db.removeFeature(id)
 		},
 		dbInsertFunc: func(db *database, body string) error {
-			var data map[string]string
-			if err := json.Unmarshal([]byte(body), &data); err != nil {
-				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)
+			type BodyFields struct {
+				Name   string   `json:"name"`
+				Source string   `json:"source"`
+				Tags   []string `json:"tags"`
+			}
+			var bodyFields BodyFields
+			if err := json.Unmarshal([]byte(body), &bodyFields); err != nil {
+				return fmt.Errorf("can't unmarshal into bodyFields: %v", err)
 			}
 
-			name := data["name"]
-			source := data["source"]
-
-			if name == "" || source == "" {
-				return fmt.Errorf("'name' or 'source' not given")
+			if bodyFields.Tags == nil || bodyFields.Name == "" || bodyFields.Source == "" {
+				return fmt.Errorf("'name', 'tags' or 'source' not given")
 			}
 
-			if !validateFeatureName(name) {
-				return fmt.Errorf("invalid feature name: '%s'", name)
+			if !validateFeatureName(bodyFields.Name) {
+				return fmt.Errorf("invalid feature name: '%s'", bodyFields.Name)
 			}
 
-			return db.insertOrUpdateFeature(&ComplianceFeature{name, source, []string{"sometag", "babab"}})
+			return db.insertOrUpdateFeature(&ComplianceFeature{bodyFields.Name, bodyFields.Source, bodyFields.Tags})
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
