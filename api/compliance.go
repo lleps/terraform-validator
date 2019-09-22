@@ -8,15 +8,11 @@ import (
 	"fmt"
 	"github.com/acarl005/stripansi"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
-)
-
-const (
-	featuresPath    = "./features"           // on which directory will save features necessary to run compliance.
-	tfComplianceBin = "terraform-compliance" // path to terraform-compliance
-
 )
 
 // complianceOutput contains the information extracted from a compliance output.
@@ -116,15 +112,17 @@ func parseComplianceOutput(output string) (complianceOutput, error) {
 // runComplianceTool runs the tfComplianceBin against the given file content.
 // fileContent may be either a json string, or a terraform binary file format.
 // Returns the input and output of the tool if successful.
-func runComplianceTool(fileContent []byte) (string, string, error) {
+func runComplianceTool(fileContent []byte, features []*ComplianceFeature) (string, string, error) {
 	if len(fileContent) == 0 {
 		return "", "", fmt.Errorf("empty file content")
 	}
 
 	var complianceToolInput []byte
 
-	// in case the content is not already a json (doesn't starts with "{"), may be in
-	// tf bin format (like plan.out or terraform.tfstate). Try to convert it to json.
+	// Only for plan.out files:
+	// In case the content is not already a json (doesn't starts with "{"), may be in
+	// tf bin format (like plan.out). Try to convert it to json.
+	// This fails when trying to convert a .tfstate, since tfstates starts with { too.
 	if fileContent[0] != '{' {
 		asJson, err := convertTerraformBinToJson(fileContent)
 		if err != nil {
@@ -135,15 +133,24 @@ func runComplianceTool(fileContent []byte) (string, string, error) {
 		complianceToolInput = fileContent
 	}
 
-	// write the json content to a tmp file
-	jsonTmpPath := os.TempDir() + "/" + "compliance_input.json"
-	if err := ioutil.WriteFile(jsonTmpPath, complianceToolInput, os.ModePerm); err != nil {
+	// Everything written to this directory
+	baseDirectory := os.TempDir() + "/" + strconv.FormatUint(rand.Uint64(), 16)
+	defer os.RemoveAll(baseDirectory)
+	inputJSONPath := baseDirectory + "/compliance_input.json"
+	featuresPath := baseDirectory + "/features"
+
+	// Write input file
+	if err := ioutil.WriteFile(inputJSONPath, complianceToolInput, os.ModePerm); err != nil {
 		return "", "", fmt.Errorf("can't create tmp file: %v", err)
 	}
-	defer os.Remove(jsonTmpPath)
+
+	// Write features directory
+	if err := makeAndFillFeaturesDirectory(featuresPath, features); err != nil {
+		return "", "", fmt.Errorf("can't write features to directory %s: %v", baseDirectory, err)
+	}
 
 	// run the compliance tool against the created file
-	toolOutputBytes, err := exec.Command(tfComplianceBin, "-p", jsonTmpPath, "-f", featuresPath).CombinedOutput()
+	toolOutputBytes, err := exec.Command("terraform-compliance", "-p", inputJSONPath, "-f", featuresPath).CombinedOutput()
 	toolOutput := stripansi.Strip(string(toolOutputBytes))
 	if err != nil {
 		_, ok := err.(*exec.ExitError)
@@ -156,9 +163,9 @@ func runComplianceTool(fileContent []byte) (string, string, error) {
 }
 
 // syncFeaturesFolderFromDB writes all the feature files that terraform-compliance requires.
-func syncFeaturesFolderFromDB(db *database) error {
-	// Empty the folder
-	if err := os.RemoveAll(featuresPath); err != nil {
+func makeAndFillFeaturesDirectory(path string, features []*ComplianceFeature) error {
+	// Delete the directory if exists
+	if err := os.RemoveAll(path); err != nil {
 		if os.IsNotExist(err) {
 			// ok. Not created yet
 		} else {
@@ -166,17 +173,15 @@ func syncFeaturesFolderFromDB(db *database) error {
 			return err
 		}
 	}
-	if err := os.MkdirAll(featuresPath, os.ModePerm); err != nil {
+
+	// Make the directory
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
 		return err
 	}
 
-	// Write all feature files
-	features, err := db.loadAllFeatures()
-	if err != nil {
-		return err
-	}
+	// Write all feature files here
 	for _, f := range features {
-		filePath := featuresPath + "/" + f.Id + ".feature"
+		filePath := path + "/" + f.Id + ".feature"
 		if err := ioutil.WriteFile(filePath, []byte(f.FeatureSource), os.ModePerm); err != nil {
 			return err
 		}

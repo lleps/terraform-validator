@@ -17,7 +17,7 @@ import (
 var (
 	listenFlag       = flag.String("listen", ":8080", "On which address to listen")
 	dynamoPrefixFlag = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
-	db               *database
+	db               *database // TODO remove this ugly global
 	timestampFormat  = time.Stamp
 )
 
@@ -31,15 +31,10 @@ func main() {
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
-	log.Printf("Init DynamoDB at prefix '%s_*'...", *dynamoPrefixFlag)
+	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
 	db = initDB(sess, *dynamoPrefixFlag)
 
-	log.Println("Sync feature files from DB...")
-	if err := syncFeaturesFolderFromDB(db); err != nil {
-		log.Fatalf("Can't sync features from db (features path: '%s'): %v", featuresPath, err)
-	}
-
-	log.Printf("Init state monitoring...")
+	log.Printf("Init state and resource monitoring tickers...")
 	initStateChangeMonitoring(sess)
 	initAccountResourcesMonitoring(sess)
 
@@ -203,7 +198,6 @@ func initEndpoints() *mux.Router {
 			return result, nil
 		},
 		dbRemoveFunc: func(db *database, id string) error {
-			defer func() { _ = syncFeaturesFolderFromDB(db) }()
 			return db.removeFeature(id)
 		},
 		dbInsertFunc: func(db *database, body string) error {
@@ -218,11 +212,11 @@ func initEndpoints() *mux.Router {
 			if name == "" || source == "" {
 				return fmt.Errorf("'name' or 'source' not given")
 			}
+
 			if !validateFeatureName(name) {
 				return fmt.Errorf("invalid feature name: '%s'", name)
 			}
 
-			defer func() { _ = syncFeaturesFolderFromDB(db) }()
 			return db.insertOrUpdateFeature(&ComplianceFeature{name, source})
 		},
 	})
@@ -323,7 +317,7 @@ func checkTFState(sess *session.Session, state *TFState) (changed bool, logEntry
 	}
 
 	// Run compliance
-	_, output, err := runComplianceTool([]byte(actualState))
+	_, output, err := runComplianceTool([]byte(actualState), make([]*ComplianceFeature, 0)) // TODO: make properly
 	if err != nil {
 		return true, nil, fmt.Errorf("can't run compliance tool: %v", err)
 	}
@@ -368,7 +362,7 @@ func validateHandler(body string, _ map[string]string) (string, int, error) {
 		return "", 0, err
 	}
 
-	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes)
+	complianceInput, complianceOutput, err := runComplianceTool(planFileBytes, make([]*ComplianceFeature, 0))
 	if err != nil {
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}

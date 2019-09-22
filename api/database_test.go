@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -22,8 +23,9 @@ func TestDynamoDB(t *testing.T) {
 	}
 
 	// 1. Insertion
+	sess := session.Must(session.NewSession())
 	expected := []*ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
-	ddb := newDynamoDB("terraformvalidator_test")
+	ddb := newDynamoDB(sess, "terraformvalidator_test")
 	require.Nil(t, ddb.initTables(), "1: insertion: ensureTableExists")
 	for _, f := range expected {
 		require.Nil(t, ddb.insertOrUpdateFeature(f), "1: insertion: insertOrUpdateFeature")
