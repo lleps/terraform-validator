@@ -65,7 +65,7 @@ function FeatureEdit(props) {
         <FeatureEditDialog
             id={id}
             onCancel={() => props.history.push("/features")}
-            onSave={() => props.history.push("/features")}
+            onSave={() => pushRefresh(props.history, "/features")}
         />
     );
 }
