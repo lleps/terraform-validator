@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"html"
-	"strconv"
 	"strings"
+	"time"
 )
 
 // ValidationLog stores a validation event information.
@@ -18,15 +18,45 @@ type ValidationLog struct {
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
 	Output        string // the compliance tool raw output
-	Details       string // optional. For kind tfstate, is bucket:path.
-	PrevInputJson string // for Kind tfstate. The previous json input.
-	PrevOutput    string // For Kind tfstate. The previous compliance output.
+	Details       string // For kind tfstate, is bucket:path.
+	PrevInputJson string // for Kind tfstate, the previous json input.
+	PrevOutput    string // For Kind tfstate, the previous compliance output.
 }
 
 const (
 	logKindValidation = "validation"
 	logKindTFState    = "tfstate"
 )
+
+func newValidationLog(inputJSON string, output string) *ValidationLog {
+	return &ValidationLog{
+		Id:        generateId(),
+		Kind:      logKindValidation,
+		DateTime:  time.Now().Format(timestampFormat),
+		InputJson: inputJSON,
+		Output:    output,
+	}
+}
+
+func newTFStateLog(
+	inputJSON string,
+	output string,
+	prevInputJSON string,
+	prevOutput string,
+	bucket string,
+	path string,
+) *ValidationLog {
+	return &ValidationLog{
+		Id:            generateId(),
+		Kind:          logKindTFState,
+		DateTime:      time.Now().Format(timestampFormat),
+		InputJson:     inputJSON,
+		Output:        output,
+		PrevInputJson: prevInputJSON,
+		PrevOutput:    prevOutput,
+		Details:       bucket + ":" + path,
+	}
+}
 
 // restObject methods
 
@@ -172,7 +202,7 @@ const validationLogTable = "logs"
 
 var validationLogAttributes = []string{"Kind", "DateTime", "InputJson", "Output", "Details", "PrevInputJson", "PrevOutput"}
 
-func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
+func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	var result []*ValidationLog
 	err := db.loadAllGeneric(
 		db.tableFor(validationLogTable),
@@ -189,30 +219,10 @@ func (db *database) loadAllValidationLogs() ([]*ValidationLog, error) {
 	return result, err
 }
 
-func (db *database) insertValidationLog(element *ValidationLog) error {
-	freeId, err := db.nextFreeValidationLogId()
-	if err != nil {
-		return err
-	}
-	element.Id = freeId
+func (db *database) insertLog(element *ValidationLog) error {
 	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), element)
 }
 
-func (db *database) removeValidationLog(id string) error {
+func (db *database) removeLog(id string) error {
 	return db.removeGeneric(db.tableFor(validationLogTable), id)
-}
-
-func (db *database) nextFreeValidationLogId() (string, error) {
-	maxId := 0
-	records, err := db.loadAllValidationLogs()
-	if err != nil {
-		return "", err
-	}
-	for _, record := range records {
-		recordId, _ := strconv.ParseInt(record.Id, 10, 64)
-		if int(recordId) > maxId {
-			maxId = int(recordId)
-		}
-	}
-	return strconv.Itoa(maxId + 1), nil
 }

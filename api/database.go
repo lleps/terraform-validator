@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/google/uuid"
 	"log"
 	"strings"
 	"time"
@@ -19,6 +20,10 @@ import (
 type database struct {
 	svc         *dynamodb.DynamoDB
 	tablePrefix string
+}
+
+func generateId() string {
+	return uuid.New().String()
 }
 
 // newDynamoDB creates a DynamoDB instance using the default aws authentication method.

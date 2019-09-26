@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"strconv"
 	"strings"
+	"time"
 )
 
 // ForeignResource defines an AWS resource that is outside terraform.
@@ -16,6 +16,16 @@ type ForeignResource struct {
 	ResourceId          string // resource id (example i-abc123)
 	ResourceDetails     string // type-specific details
 	IsException         bool   // if the resource is intentionally ok being outside terraform.
+}
+
+func newForeignResource(resourceType, resourceId, resourceDetails string) *ForeignResource {
+	return &ForeignResource{
+		Id:                  generateId(),
+		DiscoveredTimestamp: time.Now().Format(timestampFormat),
+		ResourceType:        resourceType,
+		ResourceId:          resourceId,
+		ResourceDetails:     resourceDetails,
+	}
 }
 
 // dbObject methods
@@ -83,29 +93,9 @@ func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 }
 
 func (db *database) insertForeignResource(element *ForeignResource) error {
-	freeId, err := db.nextFreeForeignResourceId()
-	if err != nil {
-		return err
-	}
-	element.Id = freeId
 	return db.insertOrUpdateGeneric(db.tableFor(foreignResourcesTable), element)
 }
 
 func (db *database) removeForeignResource(id string) error {
 	return db.removeGeneric(db.tableFor(foreignResourcesTable), id)
-}
-
-func (db *database) nextFreeForeignResourceId() (string, error) {
-	maxId := 0
-	records, err := db.loadAllForeignResources()
-	if err != nil {
-		return "", err
-	}
-	for _, record := range records {
-		recordId, _ := strconv.ParseInt(record.Id, 10, 64)
-		if int(recordId) > maxId {
-			maxId = int(recordId)
-		}
-	}
-	return strconv.Itoa(maxId + 1), nil
 }

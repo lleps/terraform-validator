@@ -223,7 +223,7 @@ func makeAndFillFeaturesDirectory(path string, features []*ComplianceFeature) er
 	// Write all feature files here
 	for _, f := range features {
 		filePath := path + "/" + f.Id + ".feature"
-		if err := ioutil.WriteFile(filePath, []byte(f.FeatureSource), os.ModePerm); err != nil {
+		if err := ioutil.WriteFile(filePath, []byte(f.Source), os.ModePerm); err != nil {
 			return err
 		}
 	}

@@ -20,8 +20,6 @@ var (
 	timestampFormat  = time.Stamp
 )
 
-// TODO: How to handle sessions properly? app-level? Used in dynamo,s3,pulling.
-
 func main() {
 	flag.Parse()
 
@@ -120,13 +118,7 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 				resourceBucket := findResourceInBuckets(r.ID())
 				if existingFr == nil {
 					if resourceBucket == nil {
-						fr := &ForeignResource{
-							DiscoveredTimestamp: time.Now().Format(timestampFormat),
-							ResourceType:        "ec2-instance",
-							ResourceId:          r.ID(),
-							ResourceDetails:     "type: ec2-micro\nami: abcde-123456",
-							IsException:         false,
-						}
+						fr := newForeignResource("ec2-instance", r.ID(), "type: ec2-micro\nami: abcde-123456")
 						if err := db.insertForeignResource(fr); err != nil {
 							log.Printf("Can't insert fr: %v", err)
 							continue
@@ -185,7 +177,7 @@ func initEndpoints(db *database) *mux.Router {
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router:   r,
 		endpoint: "/features",
-		dbFetchFunc: func(db *database) ([]restObject, error) {
+		getHandler: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllFeatures()
 			if err != nil {
 				return nil, nil
@@ -196,36 +188,34 @@ func initEndpoints(db *database) *mux.Router {
 			}
 			return result, nil
 		},
-		dbRemoveFunc: func(db *database, id string) error {
-			return db.removeFeature(id)
-		},
-		dbInsertFunc: func(db *database, body string) error {
+		deleteHandler: func(db *database, id string) error { return db.removeFeature(id) },
+		postHandler: func(db *database, body string) error {
 			type BodyFields struct {
 				Name   string   `json:"name"`
 				Source string   `json:"source"`
 				Tags   []string `json:"tags"`
 			}
-			var bodyFields BodyFields
-			if err := json.Unmarshal([]byte(body), &bodyFields); err != nil {
-				return fmt.Errorf("can't unmarshal into bodyFields: %v", err)
+			var f BodyFields
+			if err := json.Unmarshal([]byte(body), &f); err != nil {
+				return fmt.Errorf("can't unmarshal into f: %v", err)
 			}
 
-			if bodyFields.Tags == nil || bodyFields.Name == "" || bodyFields.Source == "" {
+			if f.Tags == nil || f.Name == "" || f.Source == "" {
 				return fmt.Errorf("'name', 'tags' or 'source' not given")
 			}
 
-			if !validateFeatureName(bodyFields.Name) {
-				return fmt.Errorf("invalid feature name: '%s'", bodyFields.Name)
+			if !validateFeatureName(f.Name) {
+				return fmt.Errorf("invalid feature name: '%s'", f.Name)
 			}
 
-			return db.insertOrUpdateFeature(&ComplianceFeature{bodyFields.Name, bodyFields.Source, bodyFields.Tags})
+			return db.insertOrUpdateFeature(newFeature(f.Name, f.Source, f.Tags))
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router:   r,
 		endpoint: "/logs",
-		dbFetchFunc: func(db *database) ([]restObject, error) {
-			objs, err := db.loadAllValidationLogs()
+		getHandler: func(db *database) ([]restObject, error) {
+			objs, err := db.loadAllLogs()
 			if err != nil {
 				return nil, nil
 			}
@@ -235,13 +225,13 @@ func initEndpoints(db *database) *mux.Router {
 			}
 			return result, nil
 		},
-		dbRemoveFunc: func(db *database, id string) error { return db.removeValidationLog(id) },
-		dbInsertFunc: nil, // POST not supported
+		deleteHandler: func(db *database, id string) error { return db.removeLog(id) },
+		postHandler:   nil, // POST not supported
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router:   r,
 		endpoint: "/tfstates",
-		dbFetchFunc: func(db *database) ([]restObject, error) {
+		getHandler: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllTFStates()
 			if err != nil {
 				return nil, nil
@@ -252,8 +242,8 @@ func initEndpoints(db *database) *mux.Router {
 			}
 			return result, nil
 		},
-		dbRemoveFunc: func(db *database, id string) error { return db.removeTFState(id) },
-		dbInsertFunc: func(db *database, body string) error {
+		deleteHandler: func(db *database, id string) error { return db.removeTFState(id) },
+		postHandler: func(db *database, body string) error {
 			var data map[string]string
 			if err := json.Unmarshal([]byte(body), &data); err != nil {
 				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)
@@ -266,16 +256,13 @@ func initEndpoints(db *database) *mux.Router {
 				return fmt.Errorf("'bucket' or 'path' not given")
 			}
 
-			return db.insertTFState(&TFState{
-				Bucket: bucket,
-				Path:   path,
-			})
+			return db.insertOrUpdateTFState(newTFState(bucket, path))
 		},
 	})
 	registerCollectionEndpoint(db, collectionEndpointBuilder{
 		router:   r,
 		endpoint: "/foreignresources",
-		dbFetchFunc: func(db *database) ([]restObject, error) {
+		getHandler: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllForeignResources()
 			if err != nil {
 				return nil, nil
@@ -286,8 +273,8 @@ func initEndpoints(db *database) *mux.Router {
 			}
 			return result, nil
 		},
-		dbRemoveFunc: func(db *database, id string) error { return db.removeForeignResource(id) },
-		dbInsertFunc: nil, // POST not supported
+		deleteHandler: func(db *database, id string) error { return db.removeForeignResource(id) },
+		postHandler:   nil, // POST not supported
 	})
 
 	http.Handle("/", r)
@@ -325,16 +312,8 @@ func checkTFState(sess *session.Session, db *database, state *TFState) (changed 
 
 	// Register the log entry
 	now := time.Now().Format(timestampFormat)
-	logEntry = &ValidationLog{
-		Kind:          logKindTFState,
-		DateTime:      now,
-		InputJson:     actualState,
-		Output:        output,
-		Details:       state.Bucket + ":" + state.Path,
-		PrevInputJson: state.State,
-		PrevOutput:    state.ComplianceResult,
-	}
-	if err := db.insertValidationLog(logEntry); err != nil {
+	logEntry = newTFStateLog(actualState, output, state.State, state.ComplianceResult, state.Bucket, state.Path)
+	if err := db.insertLog(logEntry); err != nil {
 		return true, nil, fmt.Errorf("can't insert logEntry on DB: %v", err)
 	}
 
@@ -343,7 +322,7 @@ func checkTFState(sess *session.Session, db *database, state *TFState) (changed 
 	state.State = actualState
 	state.ComplianceResult = output
 	state.S3LastModification = lastModification
-	if err := db.updateTFState(state); err != nil {
+	if err := db.insertOrUpdateTFState(state); err != nil {
 		return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
 	}
 	return
@@ -368,14 +347,8 @@ func validateHandler(db *database, body string, _ map[string]string) (string, in
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}
 
-	logEntry := ValidationLog{
-		Kind:      logKindValidation,
-		DateTime:  time.Now().Format(timestampFormat),
-		InputJson: complianceInput,
-		Output:    complianceOutput,
-	}
-
-	if err := db.insertValidationLog(&logEntry); err != nil {
+	logEntry := newValidationLog(complianceInput, complianceOutput)
+	if err := db.insertLog(logEntry); err != nil {
 		return "", 0, fmt.Errorf("can't insert logEntry: %v", err)
 	}
 

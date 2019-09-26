@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"strconv"
 	"strings"
 )
 
@@ -18,6 +17,14 @@ type TFState struct {
 	LastUpdate         string   // the last compliance check. "never" = not checked yet.
 	S3LastModification string   // the s3 item last modification (to avoid pulling the state when it doesn't change)
 	Tags               []string // to specify by which features this state should be checked
+}
+
+func newTFState(bucket string, path string) *TFState {
+	return &TFState{
+		Id:     generateId(),
+		Bucket: bucket,
+		Path:   path,
+	}
 }
 
 // dbObject methods
@@ -138,34 +145,10 @@ func (db *database) loadAllTFStates() ([]*TFState, error) {
 	return result, err
 }
 
-func (db *database) insertTFState(element *TFState) error {
-	freeId, err := db.nextFreeTFStateId()
-	if err != nil {
-		return err
-	}
-	element.Id = freeId
-	return db.insertOrUpdateGeneric(db.tableFor(tfStateTable), element)
-}
-
-func (db *database) updateTFState(element *TFState) error {
+func (db *database) insertOrUpdateTFState(element *TFState) error {
 	return db.insertOrUpdateGeneric(db.tableFor(tfStateTable), element)
 }
 
 func (db *database) removeTFState(id string) error {
 	return db.removeGeneric(db.tableFor(tfStateTable), id)
-}
-
-func (db *database) nextFreeTFStateId() (string, error) {
-	maxId := 0
-	records, err := db.loadAllTFStates()
-	if err != nil {
-		return "", err
-	}
-	for _, record := range records {
-		recordId, _ := strconv.ParseInt(record.Id, 10, 64)
-		if int(recordId) > maxId {
-			maxId = int(recordId)
-		}
-	}
-	return strconv.Itoa(maxId + 1), nil
 }

@@ -27,9 +27,6 @@ func registerEndpoint(
 	router.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		code := http.StatusInternalServerError
-
-		// parse body and vars
 		vars := mux.Vars(r)
 		bodyBytes, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -38,7 +35,6 @@ func registerEndpoint(
 			return
 		}
 
-		// execute the handler
 		response, code, err := handler(db, string(bodyBytes), vars)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -46,11 +42,7 @@ func registerEndpoint(
 			log.Println("Handler error:", err)
 			return
 		}
-		if response == "" {
-			response = "{}"
-		}
 
-		// write response
 		w.WriteHeader(code)
 		_, err = fmt.Fprint(w, response)
 		if err != nil {
@@ -64,8 +56,8 @@ type restObject interface {
 	id() string                                     // the obj id. To be matched in in GET,DELETE /type/{id)
 	topLevel() string                               // for CLI. what to show in GET /type
 	details() string                                // for CLI. what to show in GET /type/{id}
-	writeTopLevelFields(dst map[string]interface{}) // for json responses.  GET /type/json.
-	writeDetailedFields(dst map[string]interface{}) // for json responses.  GET /type/json/{id}.
+	writeTopLevelFields(dst map[string]interface{}) // for json responses. GET /type/json.
+	writeDetailedFields(dst map[string]interface{}) // for json responses. GET /type/json/{id}.
 }
 
 // ByRestObject wraps the type to sort by id
@@ -84,11 +76,12 @@ func (a ByRestObject) Less(i, j int) bool {
 
 // collectionEndpointBuilder contains the parameters to pass to registerCollectionEndpoint
 type collectionEndpointBuilder struct {
-	router       *mux.Router
-	endpoint     string
-	dbFetchFunc  func(db *database) ([]restObject, error)
-	dbRemoveFunc func(db *database, id string) error
-	dbInsertFunc func(db *database, body string) error
+	router        *mux.Router
+	endpoint      string
+	getHandler    func(db *database) ([]restObject, error)
+	deleteHandler func(db *database, id string) error
+	postHandler   func(db *database, body string) error
+	putHandler    func(db *database, obj restObject, body string) error
 }
 
 // registerCollectionEndpoint register automatically GET/POST/DELETE
@@ -96,9 +89,9 @@ type collectionEndpointBuilder struct {
 // for every persistent object in the database.
 func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder) {
 	// GET /endpoint and GET /endpoint/{id}
-	if builder.dbFetchFunc != nil {
+	if builder.getHandler != nil {
 		allHandler := func(_ *database, body string, _ map[string]string) (string, int, error) {
-			objs, err := builder.dbFetchFunc(db)
+			objs, err := builder.getHandler(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
@@ -112,7 +105,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 		}
 		detailsHandler := func(_ *database, body string, urlVars map[string]string) (string, int, error) {
 			id := urlVars["id"]
-			objs, err := builder.dbFetchFunc(db)
+			objs, err := builder.getHandler(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
@@ -124,7 +117,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 			return "can't find object: " + id, http.StatusNotFound, nil
 		}
 		allHandlerJSON := func(_ *database, body string, _ map[string]string) (string, int, error) {
-			objs, err := builder.dbFetchFunc(db)
+			objs, err := builder.getHandler(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
@@ -145,7 +138,7 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 		}
 		detailsHandlerJSON := func(_ *database, body string, urlVars map[string]string) (string, int, error) {
 			id := urlVars["id"]
-			objs, err := builder.dbFetchFunc(db)
+			objs, err := builder.getHandler(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
@@ -171,17 +164,17 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 	}
 
 	// DELETE /endpoint/{id}
-	if builder.dbRemoveFunc != nil {
+	if builder.deleteHandler != nil {
 		handler := func(_ *database, body string, vars map[string]string) (string, int, error) {
 			id := vars["id"]
-			objs, err := builder.dbFetchFunc(db)
+			objs, err := builder.getHandler(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("DELETE: can't fetch object: %v", err)
 			}
 
 			for _, o := range objs {
 				if o.id() == id {
-					err := builder.dbRemoveFunc(db, id)
+					err := builder.deleteHandler(db, id)
 					if err != nil {
 						return "", 0, fmt.Errorf("DELETE: can't delete object: %v", err)
 					}
@@ -196,9 +189,9 @@ func registerCollectionEndpoint(db *database, builder collectionEndpointBuilder)
 	}
 
 	// POST /endpoint
-	if builder.dbInsertFunc != nil {
+	if builder.postHandler != nil {
 		handler := func(_ *database, body string, _ map[string]string) (string, int, error) {
-			if err := builder.dbInsertFunc(db, body); err != nil {
+			if err := builder.postHandler(db, body); err != nil {
 				return "", 0, fmt.Errorf("POST: can't insert object: %v", err)
 			}
 			return "", http.StatusOK, nil
