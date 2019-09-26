@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -64,69 +63,7 @@ func (l *ValidationLog) id() string {
 	return l.Id
 }
 
-func (l *ValidationLog) topLevel() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("#%s | %s | %s | ", l.Id, l.DateTime, l.Kind))
-
-	if l.Kind == logKindTFState { // For tf state, show line changed and compliance changes.
-		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
-		sb.WriteString(fmt.Sprintf("%s | +%d, -%d lines | ", l.Details, len(added), len(removed)))
-		msgFunc := func(out string) string {
-			parsed, _ := parseComplianceOutput(out)
-			if parsed.ErrorCount() > 0 {
-				return fmt.Sprintf("%s %d/%d", failedMsg, parsed.ErrorCount(), parsed.TestCount())
-			} else {
-				return fmt.Sprintf("%s %d/%d", passedMsg, parsed.TestCount(), parsed.TestCount())
-			}
-		}
-
-		if l.PrevOutput != "" {
-			sb.WriteString(msgFunc(l.PrevOutput))
-			sb.WriteString(" -> ")
-		}
-		sb.WriteString(msgFunc(l.Output))
-	} else if l.Kind == logKindValidation { // For validations, just show compliance result
-		parsed, _ := parseComplianceOutput(l.Output)
-		if parsed.ErrorCount() > 0 {
-			sb.WriteString(fmt.Sprintf("%s %d/%d", failedMsg, parsed.ErrorCount(), parsed.TestCount()))
-		} else {
-			sb.WriteString(fmt.Sprintf("%s %d/%d", passedMsg, parsed.TestCount(), parsed.TestCount()))
-		}
-	} else {
-		sb.WriteString("<invalid kind: " + l.Kind + ">")
-	}
-	return sb.String()
-}
-
-func (l *ValidationLog) details() string {
-	sb := strings.Builder{}
-
-	// header
-	sb.WriteString("\n")
-	if l.Kind == logKindTFState {
-		sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", l.Details, l.DateTime))
-	} else {
-		sb.WriteString(fmt.Sprintf("            %s (at %s)          \n", l.Kind, l.DateTime))
-	}
-	sb.WriteString("\n")
-
-	// tfstate only: json difference
-	if l.Kind == logKindTFState {
-		sb.WriteString("Differences:")
-		sb.WriteString("\n")
-		diff := diffmatchpatch.New()
-		diffs := diff.DiffMain(l.PrevInputJson, l.InputJson, false)
-		sb.WriteString(diff.DiffPrettyText(diffs))
-		sb.WriteString("\n")
-	}
-
-	// Features
-	parsed, _ := parseComplianceOutput(l.Output)
-	sb.WriteString(parsed.String())
-	return sb.String()
-}
-
-func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
+func (l *ValidationLog) writeBasic(dst map[string]interface{}) {
 	dst["kind"] = l.Kind
 	dst["date_time"] = l.DateTime
 	dst["details"] = l.Details
@@ -149,8 +86,8 @@ func (l *ValidationLog) writeTopLevelFields(dst map[string]interface{}) {
 	}
 }
 
-func (l *ValidationLog) writeDetailedFields(dst map[string]interface{}) {
-	l.writeTopLevelFields(dst)
+func (l *ValidationLog) writeDetailed(dst map[string]interface{}) {
+	l.writeBasic(dst)
 
 	// Write state diff
 	diff := diffmatchpatch.New()

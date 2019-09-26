@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"strings"
 	"time"
 )
 
@@ -34,30 +32,7 @@ func (r *ForeignResource) id() string {
 	return r.Id
 }
 
-func (r *ForeignResource) topLevel() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("#%s | %s | type: %s | id: %s | is exception: %v",
-		r.Id,
-		r.DiscoveredTimestamp,
-		r.ResourceType,
-		r.ResourceId,
-		r.IsException))
-	return sb.String()
-}
-
-func (r *ForeignResource) details() string {
-	sb := strings.Builder{}
-	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("      Id #%s, discovered %s\n", r.Id, r.DiscoveredTimestamp))
-	sb.WriteString(fmt.Sprintf("      Type: %s, Id: %s\n", r.ResourceType, r.ResourceId))
-	sb.WriteString("\n")
-	sb.WriteString("Resource details:\n")
-	sb.WriteString(r.ResourceDetails)
-	sb.WriteString("\n")
-	return sb.String()
-}
-
-func (r *ForeignResource) writeTopLevelFields(dst map[string]interface{}) {
+func (r *ForeignResource) writeBasic(dst map[string]interface{}) {
 	dst["date_time"] = r.DiscoveredTimestamp
 	dst["resource_id"] = r.ResourceId
 	dst["resource_type"] = r.ResourceType
@@ -65,7 +40,7 @@ func (r *ForeignResource) writeTopLevelFields(dst map[string]interface{}) {
 	dst["is_exception"] = r.IsException
 }
 
-func (r *ForeignResource) writeDetailedFields(dst map[string]interface{}) {
+func (r *ForeignResource) writeDetailed(dst map[string]interface{}) {
 
 }
 

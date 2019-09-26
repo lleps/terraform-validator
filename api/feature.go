@@ -23,23 +23,15 @@ func (f *ComplianceFeature) id() string {
 	return f.Id
 }
 
-func (f *ComplianceFeature) topLevel() string {
-	return f.Id
-}
-
-func (f *ComplianceFeature) details() string {
-	return f.Source
-}
-
-func (f *ComplianceFeature) writeTopLevelFields(dst map[string]interface{}) {
+func (f *ComplianceFeature) writeBasic(dst map[string]interface{}) {
 	dst["name"] = f.Name
 	dst["source"] = f.Source
 	dst["tags"] = f.Tags
 	dst["enabled"] = true
 }
 
-func (f *ComplianceFeature) writeDetailedFields(dst map[string]interface{}) {
-	f.writeTopLevelFields(dst)
+func (f *ComplianceFeature) writeDetailed(dst map[string]interface{}) {
+	f.writeBasic(dst)
 }
 
 // Database methods

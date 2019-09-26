@@ -174,10 +174,10 @@ func initStateChangeMonitoring(sess *session.Session, db *database) {
 func initEndpoints(db *database) *mux.Router {
 	r := mux.NewRouter()
 	registerEndpoint(r, db, "/validate", validateHandler, "POST")
-	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router:   r,
-		endpoint: "/features",
-		getHandler: func(db *database) ([]restObject, error) {
+
+	// '/features' supports all methods.
+	registerObjEndpoints(r, "/features", db, restObjectHandler{
+		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllFeatures()
 			if err != nil {
 				return nil, nil
@@ -189,9 +189,35 @@ func initEndpoints(db *database) *mux.Router {
 			return result, nil
 		},
 		deleteHandler: func(db *database, id string) error { return db.removeFeature(id) },
-		postHandler: func(db *database, body string) error {
+		postHandler: func(db *database, body string) (restObject, error) {
 			type BodyFields struct {
 				Name   string   `json:"name"`
+				Source string   `json:"source"`
+				Tags   []string `json:"tags"`
+			}
+			var f BodyFields
+			if err := json.Unmarshal([]byte(body), &f); err != nil {
+				return nil, fmt.Errorf("can't unmarshal into f: %v", err)
+			}
+
+			if f.Tags == nil || f.Name == "" || f.Source == "" {
+				return nil, fmt.Errorf("'name', 'tags' or 'source' not given")
+			}
+
+			if !validateFeatureName(f.Name) {
+				return nil, fmt.Errorf("invalid feature name: '%s'", f.Name)
+			}
+
+			feature := newFeature(f.Name, f.Source, f.Tags)
+			err := db.insertOrUpdateFeature(feature)
+			if err != nil {
+				return nil, err
+			}
+
+			return feature, nil
+		},
+		putHandler: func(db *database, obj restObject, body string) error {
+			type BodyFields struct {
 				Source string   `json:"source"`
 				Tags   []string `json:"tags"`
 			}
@@ -200,21 +226,16 @@ func initEndpoints(db *database) *mux.Router {
 				return fmt.Errorf("can't unmarshal into f: %v", err)
 			}
 
-			if f.Tags == nil || f.Name == "" || f.Source == "" {
-				return fmt.Errorf("'name', 'tags' or 'source' not given")
-			}
-
-			if !validateFeatureName(f.Name) {
-				return fmt.Errorf("invalid feature name: '%s'", f.Name)
-			}
-
-			return db.insertOrUpdateFeature(newFeature(f.Name, f.Source, f.Tags))
+			feature := obj.(*ComplianceFeature)
+			feature.Source = f.Source
+			feature.Tags = f.Tags
+			return db.insertOrUpdateFeature(feature)
 		},
 	})
-	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router:   r,
-		endpoint: "/logs",
-		getHandler: func(db *database) ([]restObject, error) {
+
+	// '/logs' supports just GET and DELETE, since they're generated automatically.
+	registerObjEndpoints(r, "/logs", db, restObjectHandler{
+		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllLogs()
 			if err != nil {
 				return nil, nil
@@ -226,12 +247,11 @@ func initEndpoints(db *database) *mux.Router {
 			return result, nil
 		},
 		deleteHandler: func(db *database, id string) error { return db.removeLog(id) },
-		postHandler:   nil, // POST not supported
 	})
-	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router:   r,
-		endpoint: "/tfstates",
-		getHandler: func(db *database) ([]restObject, error) {
+
+	// '/tfstates' supports all methods.
+	registerObjEndpoints(r, "/tfstates", db, restObjectHandler{
+		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllTFStates()
 			if err != nil {
 				return nil, nil
@@ -243,26 +263,51 @@ func initEndpoints(db *database) *mux.Router {
 			return result, nil
 		},
 		deleteHandler: func(db *database, id string) error { return db.removeTFState(id) },
-		postHandler: func(db *database, body string) error {
+		postHandler: func(db *database, body string) (restObject, error) {
 			var data map[string]string
 			if err := json.Unmarshal([]byte(body), &data); err != nil {
-				return fmt.Errorf("can't unmarshal into map[string]string: %v", err)
+				return nil, fmt.Errorf("can't unmarshal into map[string]string: %v", err)
 			}
 
 			bucket := data["bucket"]
 			path := data["path"]
 
 			if bucket == "" || path == "" {
+				return nil, fmt.Errorf("'bucket' or 'path' not given")
+			}
+
+			tfstate := newTFState(bucket, path)
+			if err := db.insertOrUpdateTFState(tfstate); err != nil {
+				return nil, err
+			}
+
+			return tfstate, nil
+		},
+		putHandler: func(db *database, obj restObject, body string) error {
+			type BodyFields struct {
+				Bucket string   `json:"bucket"`
+				Path   string   `json:"path"`
+				Tags   []string `json:"tags"`
+			}
+			var f BodyFields
+			if err := json.Unmarshal([]byte(body), &f); err != nil {
+				return fmt.Errorf("can't unmarshal into f: %v", err)
+			}
+			if f.Bucket == "" || f.Path == "" {
 				return fmt.Errorf("'bucket' or 'path' not given")
 			}
 
-			return db.insertOrUpdateTFState(newTFState(bucket, path))
+			tfstate := obj.(*TFState)
+			tfstate.Bucket = f.Bucket
+			tfstate.Path = f.Path
+			tfstate.Tags = f.Tags
+			return nil
 		},
 	})
-	registerCollectionEndpoint(db, collectionEndpointBuilder{
-		router:   r,
-		endpoint: "/foreignresources",
-		getHandler: func(db *database) ([]restObject, error) {
+
+	// /foreignresources supports just GET.
+	registerObjEndpoints(r, "/foreignresources", db, restObjectHandler{
+		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllForeignResources()
 			if err != nil {
 				return nil, nil
@@ -273,8 +318,6 @@ func initEndpoints(db *database) *mux.Router {
 			}
 			return result, nil
 		},
-		deleteHandler: func(db *database, id string) error { return db.removeForeignResource(id) },
-		postHandler:   nil, // POST not supported
 	})
 
 	http.Handle("/", r)
