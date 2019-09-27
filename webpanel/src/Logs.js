@@ -29,7 +29,7 @@ export class LogDetailsDialog extends React.Component {
     };
 
     componentDidMount() {
-        axios.get("/logs/json/" + this.props.id)
+        axios.get("/logs/" + this.props.id)
             .then(res => {
                 const details = res.data;
                 this.setState({ details: details, diffHtml: details.state_diff_html });
@@ -217,7 +217,7 @@ export class LogsTable extends React.Component {
 
     fetchData() {
         this.setState({ updating: true });
-        axios.get(`/logs/json`)
+        axios.get(`/logs`)
             .then(res => {
                 const logs = res.data;
                 this.setState({ logs });

@@ -14,7 +14,7 @@ export class ForeignResourcesTable extends React.Component {
     };
 
     componentDidMount() {
-        axios.get(`/foreignresources/json`)
+        axios.get(`/foreignresources`)
             .then(res => {
                 const foreignresources = res.data;
                 this.setState({ foreignresources });

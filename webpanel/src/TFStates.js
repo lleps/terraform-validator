@@ -25,7 +25,7 @@ export function TFStateAddDialog({ onAdd, onCancel }) {
     const [inputError, setInputError] = React.useState("");
 
     function onClickOk() {
-        axios.get(`/tfstates/json`).then(res => {
+        axios.get(`/tfstates`).then(res => {
             if (res.data.findIndex(obj => (obj.path === path && obj.bucket === bucket)) === -1) {
                 axios.post(`/tfstates`, {
                     bucket: bucket,
@@ -188,7 +188,7 @@ export class TFStatesTable extends React.Component {
 
     fetchData() {
         this.setState({ updating: true });
-        axios.get(`/tfstates/json`)
+        axios.get(`/tfstates`)
             .then(res => {
                 const tfstates = res.data;
                 this.setState({ tfstates });

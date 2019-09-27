@@ -24,7 +24,7 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
     const [inputError, setInputError] = React.useState("");
 
     function onClickOk() {
-        axios.get(`/features/json`).then(res => {
+        axios.get(`/features`).then(res => {
             if (res.data.findIndex(obj => obj.id === name) === -1) {
                 if (!nameIsValid(name)) {
                     setInputError("Invalid name.");
@@ -99,7 +99,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [tags, setTags] = React.useState("");
 
     React.useEffect(() => {
-        axios.get("/features/json/" + id)
+        axios.get("/features/" + id)
             .then(res => {
                 setSource(res.data.source);
                 if (res.data.tags != null) {
@@ -213,7 +213,7 @@ export class FeaturesTable extends React.Component {
     fetchData() {
         this.setState({ updating: true });
 
-        axios.get(`/features/json`).then(res => {
+        axios.get(`/features`).then(res => {
             const features = res.data;
             this.setState({ features: features, updating: false });
         }).catch(error => {
