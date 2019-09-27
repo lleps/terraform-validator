@@ -205,7 +205,7 @@ export class TFStatesTable extends React.Component {
             <React.Fragment>
                 { this.state.deleting != null ? <DeleteDialog
                     deleteUrl={"/tfstates/" + this.state.deleting}
-                    message={"Delete TFState #" + this.state.deleting + "?"}
+                    message={"Delete TFState?"}
                     onCancel={() => this.setState({ deleting: null })}
                     onDelete={() => {
                         this.setState({ deleting: null });

@@ -25,7 +25,7 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
 
     function onClickOk() {
         axios.get(`/features`).then(res => {
-            if (res.data.findIndex(obj => obj.id === name) === -1) {
+            if (res.data.findIndex(obj => obj.name === name) === -1) {
                 if (!nameIsValid(name)) {
                     setInputError("Invalid name.");
                     return;
@@ -35,8 +35,8 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
                     name: name,
                     source: "\n\n\n\n",
                     tags: ["default"]
-                }).then(() => {
-                    onAdd(name);
+                }).then((res) => {
+                    onAdd(res.data.id);
                 }).catch(error => {
                     console.log(error);
                 })
@@ -93,6 +93,7 @@ export function FeatureAddDialog({ onAdd, onCancel }) {
 }
 
 export function FeatureEditDialog({ id, onSave, onCancel }) {
+    const [name, setName] = React.useState("");
     const [source, setSource] = React.useState("");
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
@@ -102,6 +103,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         axios.get("/features/" + id)
             .then(res => {
                 setSource(res.data.source);
+                setName(res.data.name);
                 if (res.data.tags != null) {
                     setTags(res.data.tags.join(","));
                 }
@@ -112,8 +114,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
 
     function save() {
         setSaving(true);
-        axios.post(`/features`, {
-            name: id,
+        axios.put(`/features/` + id, {
             source: source,
             tags: tags.split(",")
         }).then(() => {
@@ -178,7 +179,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
             maxWidth="md"
             open={true}
             onClose={() => onCancel()} aria-labelledby="form-dialog-title">
-            <DialogTitle>Edit {id}</DialogTitle>
+            <DialogTitle>{loading ? "" : "Edit " + name}</DialogTitle>
             <DialogContent>
                 {body}
             </DialogContent>
@@ -231,7 +232,7 @@ export class FeaturesTable extends React.Component {
             <React.Fragment>
                 { this.state.deleting != null
                     ? <DeleteDialog
-                        message={"Delete feature '" + this.state.deleting + "'?"}
+                        message={"Delete feature?"}
                         deleteUrl={"/features/" + this.state.deleting}
                         onDelete={() => {
                             this.setState({ deleting: null});
@@ -256,7 +257,7 @@ export class FeaturesTable extends React.Component {
                         { this.state.features
                             .map(f => (
                                 <TableRow key={f.id}>
-                                    <TableCell>{f.id}</TableCell>
+                                    <TableCell>{f.name}</TableCell>
                                     <TableCell>{FeatureEnabledLabel(f)}</TableCell>
                                     <TableCell>{
                                         (f.tags || []).map((t) => <span><code className={"label"}>{t}</code>&nbsp;</span> )}  </TableCell>

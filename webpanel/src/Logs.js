@@ -16,7 +16,6 @@ import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
-import {DeleteDialog} from "./DeleteDialog";
 
 export class LogDetailsDialog extends React.Component {
     constructor(props) {
@@ -212,7 +211,6 @@ export class LogsTable extends React.Component {
     state = {
         logs: [],
         updating: false,
-        deleting: null,
     };
 
     fetchData() {
@@ -232,19 +230,6 @@ export class LogsTable extends React.Component {
     render() {
         return (
             <React.Fragment>
-                {this.state.deleting != null
-                    ? <DeleteDialog
-                        message={"Delete Log Event #" + this.state.deleting + "?"}
-                        deleteUrl={"/logs/" + this.state.deleting}
-                        onCancel={() => this.setState({deleting: null})}
-                        onDelete={() => {
-                            this.fetchData();
-                            this.setState({deleting: null});
-                        }}
-                    />
-                    : ""
-                }
-
                 <Title>Latest {this.props.kind === "tfstate" ? "State Changes" : "Validations"}</Title>
                 <Table size="small">
                     <TableHead>
@@ -262,9 +247,6 @@ export class LogsTable extends React.Component {
                                     <TableCell align="right">
                                         <IconButton onClick={() => this.props.onSelectInfo(l.id)} >
                                             <Info/>
-                                        </IconButton>
-                                        <IconButton onClick={() => this.setState({ deleting: l.id })}>
-                                            <Delete/>
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>
