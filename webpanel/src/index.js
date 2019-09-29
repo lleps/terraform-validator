@@ -4,6 +4,11 @@ import './index.css';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
 import axios from 'axios';
+import JavascriptTimeAgo from 'javascript-time-ago'
+import en from 'javascript-time-ago/locale/en'
+
+// init time ago lib
+JavascriptTimeAgo.locale(en);
 
 // configure custom axios url
 let proto = window.location.protocol;

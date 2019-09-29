@@ -16,6 +16,7 @@ import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
+import {TimeAgo} from "./Time";
 
 export class LogDetailsDialog extends React.Component {
     constructor(props) {
@@ -36,8 +37,6 @@ export class LogDetailsDialog extends React.Component {
     }
 
     render() {
-        let atDate = this.state.details !== null ? "at " + this.state.details.date_time : "";
-
         // Add all features, prev and current, to this list.
         let allFeatures = [];
         if (this.state.details !== null) {
@@ -62,7 +61,7 @@ export class LogDetailsDialog extends React.Component {
                 open={true}
                 onClose={() => this.props.onClose()} aria-labelledby="form-dialog-title">
                 <DialogTitle id="customized-dialog-title" onClose={() => {}}>
-                    Details for Event #{this.props.id} {atDate}
+                    Event Details
                 </DialogTitle>
                 <DialogContent>
                     { this.state.details === null ? <div align="center"><CircularProgress/></div> : "" }
@@ -187,7 +186,7 @@ function LogTableCells(l) {
     if (l.kind === "tfstate") {
         return (
             <React.Fragment>
-                <TableCell>{l.date_time}</TableCell>
+                <TableCell><TimeAgo timestamp={l.timestamp}/></TableCell>
                 <TableCell>{l.details}</TableCell>
                 <TableCell>{LinesChangedLabel(l)}</TableCell>
                 <TableCell>{ValidationState(l)}</TableCell>
@@ -196,7 +195,7 @@ function LogTableCells(l) {
     } else {
         return (
             <React.Fragment>
-                <TableCell>{l.date_time}</TableCell>
+                <TableCell><TimeAgo date={l.timestamp}/></TableCell>
                 <TableCell>{ValidationState(l)}</TableCell>
             </React.Fragment>
         );

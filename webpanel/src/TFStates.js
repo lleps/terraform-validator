@@ -9,7 +9,7 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
-import {Delete, Edit, Info, Label} from "@material-ui/icons";
+import {AccessTime, Delete, Edit, Info, Label} from "@material-ui/icons";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import Dialog from "@material-ui/core/Dialog";
@@ -19,6 +19,7 @@ import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import {DeleteDialog} from "./DeleteDialog";
 import {TagList, TagListField} from "./TagList";
+import {TimeAgo} from "./Time";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
@@ -243,6 +244,7 @@ export class TFStatesTable extends React.Component {
                 <Table size="small">
                     <TableHead>
                         <TableRow>
+                            <TableCell><AccessTime/></TableCell>
                             <TableCell>Bucket@Path</TableCell>
                             <TableCell>Last Update</TableCell>
                             <TableCell>Compliant</TableCell>
@@ -253,6 +255,7 @@ export class TFStatesTable extends React.Component {
                         { this.state.tfstates
                             .map(l => (
                                 <TableRow key={l.id}>
+                                    <TableCell><TimeAgo timestamp={l.timestamp}/></TableCell>
                                     <TableCell>{l.bucket}<b>@</b>{l.path}</TableCell>
                                     <TableCell>
                                         <TagList tags={l.tags}/>

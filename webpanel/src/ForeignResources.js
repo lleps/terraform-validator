@@ -7,6 +7,7 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
+import {TimeAgo} from "./Time";
 
 export class ForeignResourcesTable extends React.Component {
     state = {
@@ -41,7 +42,7 @@ export class ForeignResourcesTable extends React.Component {
                         { this.state.foreignresources
                             .map(l => (
                                 <TableRow key={l.id}>
-                                    <TableCell>{l.date_time}</TableCell>
+                                    <TableCell><TimeAgo timestamp={l.timestamp}/></TableCell>
                                     <TableCell>{l.resource_type}</TableCell>
                                     <TableCell>
                                         {l.resource_id}
