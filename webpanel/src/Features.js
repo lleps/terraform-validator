@@ -18,6 +18,7 @@ import IconButton from "@material-ui/core/IconButton";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import {DeleteDialog} from "./DeleteDialog";
 import InputAdornment from "@material-ui/core/InputAdornment";
+import {TagList, TagListField} from "./TagList";
 
 export function FeatureAddDialog({ onAdd, onCancel }) {
     const [name, setName] = React.useState("");
@@ -97,16 +98,14 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [source, setSource] = React.useState("");
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
-    const [tags, setTags] = React.useState("");
+    const [tags, setTags] = React.useState([]);
 
     React.useEffect(() => {
         axios.get("/features/" + id)
             .then(res => {
                 setSource(res.data.source);
                 setName(res.data.name);
-                if (res.data.tags != null) {
-                    setTags(res.data.tags.join(","));
-                }
+                setTags(res.data.tags || []);
                 setLoading(false);
             })
             .catch(err => console.log("error getting details: " + err));
@@ -116,7 +115,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         setSaving(true);
         axios.put(`/features/` + id, {
             source: source,
-            tags: tags.split(",")
+            tags: tags
         }).then(() => {
             setSaving(false);
             onSave();
@@ -130,26 +129,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         body = <div align={"center"}><CircularProgress/></div>;
     } else {
         body = <div>
-            <TextField
-                id="tags"
-                label={"Tags"}
-                value={tags}
-                autoComplete={"off"}
-                InputProps={{
-                    style: {
-                        fontFamily: "Monospace",
-                        background: "#DDDDDD"
-                    },
-                    startAdornment: (
-                        <InputAdornment position="start">
-                            <Label />
-                        </InputAdornment>
-                    ),
-                }}
-                onChange={e => setTags(e.target.value)}
-                fullWidth
-                margin="normal"
-            />
+            <TagListField tags={tags} onChange={(t) => setTags(t)}/>
             <TextField
                 id="filled-full-width"
                 multiline
@@ -259,8 +239,9 @@ export class FeaturesTable extends React.Component {
                                 <TableRow key={f.id}>
                                     <TableCell>{f.name}</TableCell>
                                     <TableCell>{FeatureEnabledLabel(f)}</TableCell>
-                                    <TableCell>{
-                                        (f.tags || []).map((t) => <span><code className={"label"}>{t}</code>&nbsp;</span> )}  </TableCell>
+                                    <TableCell>
+                                        <TagList tags={f.tags} />
+                                    </TableCell>
                                     <TableCell align="right">
                                         <IconButton onClick={() => this.props.onSelect(f.id)}>
                                             <Edit/>

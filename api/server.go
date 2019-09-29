@@ -264,19 +264,20 @@ func initEndpoints(db *database) *mux.Router {
 		},
 		deleteHandler: func(db *database, id string) error { return db.removeTFState(id) },
 		postHandler: func(db *database, body string) (restObject, error) {
-			var data map[string]string
-			if err := json.Unmarshal([]byte(body), &data); err != nil {
-				return nil, fmt.Errorf("can't unmarshal into map[string]string: %v", err)
+			type BodyFields struct {
+				Bucket string   `json:"bucket"`
+				Path   string   `json:"path"`
+				Tags   []string `json:"tags"`
 			}
-
-			bucket := data["bucket"]
-			path := data["path"]
-
-			if bucket == "" || path == "" {
+			var f BodyFields
+			if err := json.Unmarshal([]byte(body), &f); err != nil {
+				return nil, fmt.Errorf("can't unmarshal into f: %v", err)
+			}
+			if f.Bucket == "" || f.Path == "" {
 				return nil, fmt.Errorf("'bucket' or 'path' not given")
 			}
 
-			tfstate := newTFState(bucket, path)
+			tfstate := newTFState(f.Bucket, f.Path, f.Tags)
 			if err := db.insertOrUpdateTFState(tfstate); err != nil {
 				return nil, err
 			}
@@ -301,7 +302,7 @@ func initEndpoints(db *database) *mux.Router {
 			tfstate.Bucket = f.Bucket
 			tfstate.Path = f.Path
 			tfstate.Tags = f.Tags
-			return nil
+			return db.insertOrUpdateTFState(tfstate)
 		},
 	})
 

@@ -17,11 +17,12 @@ type TFState struct {
 	Tags               []string // to specify by which features this state should be checked
 }
 
-func newTFState(bucket string, path string) *TFState {
+func newTFState(bucket string, path string, tags []string) *TFState {
 	return &TFState{
 		Id:     generateId(),
 		Bucket: bucket,
 		Path:   path,
+		Tags:   tags,
 	}
 }
 
@@ -35,6 +36,7 @@ func (state *TFState) writeBasic(dst map[string]interface{}) {
 	dst["path"] = state.Path
 	dst["bucket"] = state.Bucket
 	dst["last_update"] = state.LastUpdate
+	dst["tags"] = state.Tags
 	if state.ComplianceResult == "" {
 		dst["compliance_present"] = false
 		return

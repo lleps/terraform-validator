@@ -9,7 +9,7 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
-import {Delete, Info} from "@material-ui/icons";
+import {Delete, Edit, Info, Label} from "@material-ui/icons";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import Dialog from "@material-ui/core/Dialog";
@@ -18,29 +18,54 @@ import DialogContent from "@material-ui/core/DialogContent";
 import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import {DeleteDialog} from "./DeleteDialog";
+import {TagList, TagListField} from "./TagList";
 
-export function TFStateAddDialog({ onAdd, onCancel }) {
+export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
+    const [loading, setLoading] = React.useState(false);
     const [bucket, setBucket] = React.useState("");
     const [path, setPath] = React.useState("");
     const [inputError, setInputError] = React.useState("");
+    const [tags, setTags] = React.useState(!editMode ? ["default"] : []);
+
+    React.useEffect(() => {
+        if (editMode) {
+            setLoading(true);
+            axios.get("/tfstates/" + id)
+                .then(res => {
+                    setPath(res.data.path);
+                    setBucket(res.data.bucket);
+                    setTags(res.data.tags || []);
+                    setLoading(false);
+                })
+                .catch(err => console.log("error getting details: " + err));
+        }
+    }, []);
 
     function onClickOk() {
-        axios.get(`/tfstates`).then(res => {
-            if (res.data.findIndex(obj => (obj.path === path && obj.bucket === bucket)) === -1) {
-                axios.post(`/tfstates`, {
-                    bucket: bucket,
-                    path: path,
-                }).then(() => {
-                    onAdd();
-                }).catch(error => {
-                    console.log(error);
-                })
-            } else {
-                setInputError("That bucket:path is already registered.");
-            }
-        }).catch(error => {
-            console.log(error);
-        })
+        let body = {
+            bucket: bucket,
+            path: path,
+            tags: tags
+        };
+        function anyTFStateMatchingBucketPath(list) {
+            return list.findIndex(obj => (obj.path === path && obj.bucket === bucket)) !== -1
+        }
+
+        if (!editMode) { // POST (with tfstate duplication check)
+            axios.get(`/tfstates`).then(res => {
+                if (anyTFStateMatchingBucketPath(res.data)) {
+                    setInputError("The bucket:path combination already exists.");
+                } else {
+                    axios.post(`/tfstates`, body).then(() => {
+                        onAdd()
+                    })
+                }
+            })
+        } else { // just PUT
+            axios.put(`/tfstates/` + id, body).then(() => {
+                onAdd()
+            })
+        }
     }
 
     function handlePathChange(e) {
@@ -57,10 +82,11 @@ export function TFStateAddDialog({ onAdd, onCancel }) {
         return bucket.length > 0 && path.length > 0;
     }
 
-    return <div>
-        <Dialog open={true} onClose={() => onCancel()}>
-            <DialogTitle>Add TFState</DialogTitle>
+
+    return <Dialog open={true} onClose={() => onCancel()}>
+            <DialogTitle>{editMode ? "Edit" : "Add"} TFState</DialogTitle>
             <DialogContent>
+                { loading ? <div align={"center"}><CircularProgress/></div> : "" }
                 <TextField
                     autoComplete="off"
                     autoFocus
@@ -84,17 +110,17 @@ export function TFStateAddDialog({ onAdd, onCancel }) {
                     type="text"
                     fullWidth
                 />
+                <TagListField tags={tags} onChange={(t) => setTags(t)}/>
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => onCancel()} color="primary">
                     Cancel
                 </Button>
-                <Button onClick={() => onClickOk()} color="primary" disabled={!inputNotEmpty() || inputError !== ""}>
-                    Add
+                <Button onClick={() => onClickOk()} color="primary" disabled={loading || !inputNotEmpty() || inputError !== ""}>
+                    { editMode ? "Save" : "Add" }
                 </Button>
             </DialogActions>
         </Dialog>
-    </div>
 }
 
 function LastUpdateLabel(data) {
@@ -219,6 +245,7 @@ export class TFStatesTable extends React.Component {
                         <TableRow>
                             <TableCell>Bucket</TableCell>
                             <TableCell>Path</TableCell>
+                            <TableCell>Tags</TableCell>
                             <TableCell>Last Update</TableCell>
                             <TableCell>Compliant</TableCell>
                             <TableCell align="right"/>
@@ -230,9 +257,15 @@ export class TFStatesTable extends React.Component {
                                 <TableRow key={l.id}>
                                     <TableCell>{l.bucket}</TableCell>
                                     <TableCell>{l.path}</TableCell>
+                                    <TableCell>
+                                        <TagList tags={l.tags}/>
+                                    </TableCell>
                                     <TableCell>{LastUpdateLabel(l)}</TableCell>
                                     <TableCell>{TableEntryComplianceLabel(l)} {TableEntryComplianceTooltip(l)}</TableCell>
                                     <TableCell align="right">
+                                        <IconButton onClick={() => this.props.onEdit(l.id)}>
+                                            <Edit/>
+                                        </IconButton>
                                         <IconButton onClick={() => this.setState({ deleting: l.id })}>
                                             <Delete/>
                                         </IconButton>

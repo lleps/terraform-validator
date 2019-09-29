@@ -16,5 +16,32 @@ body {
 }
 
 .label {
-  background: #DDDDDD;
+  color: #eceff1;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 12px;
+  background: #008b00;
+  padding: 7px;
 }
+
+/* colors for different label backgrounds */
+.label-0 { background: #000000; }
+.label-1 { background: #B71C1C; }
+.label-2 { background: #880E4F; }
+.label-3 { background: #4A148C; }
+.label-4 { background: #311B92; }
+.label-5 { background: #1A237E; }
+.label-6 { background: #0D47A1; }
+.label-7 { background: #01579B; }
+.label-8 { background: #006064; }
+.label-9 { background: #004D40; }
+.label-10 { background: #1B5E20; }
+.label-11 { background: #33691E; }
+.label-12 { background: #827717; }
+.label-13 { background: #F57F17; }
+.label-14 { background: #FF6F00; }
+.label-15 { background: #E65100; }
+.label-16 { background: #BF360C; }
+.label-17 { background: #3E2723; }
+.label-18 { background: #212121; }
+.label-19 { background: #263238; }

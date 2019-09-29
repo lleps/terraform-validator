@@ -6,7 +6,7 @@ import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
 import {LogDetailsDialog, LogsTable, ValidationLogsTable} from "./Logs";
 import {FeatureAddDialog, FeatureEditDialog, FeaturesTable} from "./Features";
-import {TFStateAddDialog, TFStatesTable} from "./TFStates";
+import {TFStateDialog, TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
 import FloatingActionButtons from "./Fab";
@@ -99,7 +99,20 @@ function LogDetails(props) {
 
 function TFStateAdd(props) {
     return (
-        <TFStateAddDialog
+        <TFStateDialog
+            editMode={false}
+            onAdd={() => pushRefresh(props.history, "/tfstates")}
+            onCancel={() => props.history.push("/tfstates")}
+        />
+    );
+}
+
+function TFStateEdit(props) {
+    let id = props.match.params.id;
+    return (
+        <TFStateDialog
+            id={id}
+            editMode={true}
             onAdd={() => pushRefresh(props.history, "/tfstates")}
             onCancel={() => props.history.push("/tfstates")}
         />
@@ -112,9 +125,10 @@ function TFStates(props) {
     return (
         <div>
             <Route path={`${props.match.url}/add`} component={TFStateAdd} />
+            <Route path={`${props.match.url}/edit/:id`} component={TFStateEdit} />
             <Grid item xs={12}>
                 <Paper className={classes.paper}>
-                    <TFStatesTable/>
+                    <TFStatesTable onEdit={(id) => props.history.push("/tfstates/edit/" + id)}/>
                 </Paper>
             </Grid>
             <FloatingActionButtons onClick={() => props.history.push("/tfstates/add")} />
