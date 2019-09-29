@@ -6,10 +6,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
+	"time"
 )
 
 // registerEndpoint registers in the router an HTTP request
@@ -50,9 +53,34 @@ func registerEndpoint(
 
 // restObject defines some generic methods for objects that are accessible through the rest API.
 type restObject interface {
-	id() string                               // The object id.
+	id() string                               // The object uuid
+	timestamp() int64                         // When this object was created.
 	writeBasic(dst map[string]interface{})    // Write short object fields (when getting all objects).
 	writeDetailed(dst map[string]interface{}) // Write detailed fields (when getting this specific object).
+}
+
+// generateId generates a new UUID for a new rest object.
+func generateId() string {
+	return uuid.New().String()
+}
+
+// generateTimestamp generates the timestamp value required for rest objects.
+func generateTimestamp() int64 {
+	return time.Now().Unix()
+}
+
+func restObjectTime(obj restObject) time.Time {
+	return time.Unix(obj.timestamp(), 0)
+}
+
+// ByRestObject wraps the type to sort by timestamp, since dynamo
+// doesn't keep the insert order of entities.
+type ByRestObject []restObject
+
+func (a ByRestObject) Len() int      { return len(a) }
+func (a ByRestObject) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByRestObject) Less(i, j int) bool {
+	return a[i].timestamp() < a[j].timestamp()
 }
 
 // restObjectHandler contains the handlers that effectively perform the operations.
@@ -82,10 +110,15 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			for _, o := range objs {
 				dst := make(map[string]interface{})
 				dst["id"] = o.id()
+				dst["timestamp"] = o.timestamp()
 				o.writeBasic(dst)
 				result = append(result, dst)
 			}
 
+			// sort the list by timestamp
+			sort.Sort(ByRestObject(objs))
+
+			// jsonify and return
 			asJSON, err := json.MarshalIndent(result, "", "\t")
 			if err != nil {
 				return "", 0, err

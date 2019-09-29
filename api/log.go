@@ -12,7 +12,8 @@ import (
 
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
-	Id            string // number of the log entry
+	Id            string
+	Timestamp     int64
 	Kind          string // "tfstate" or "validation".
 	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
@@ -30,6 +31,7 @@ const (
 func newValidationLog(inputJSON string, output string) *ValidationLog {
 	return &ValidationLog{
 		Id:        generateId(),
+		Timestamp: generateTimestamp(),
 		Kind:      logKindValidation,
 		DateTime:  time.Now().Format(timestampFormat),
 		InputJson: inputJSON,
@@ -61,6 +63,10 @@ func newTFStateLog(
 
 func (l *ValidationLog) id() string {
 	return l.Id
+}
+
+func (l *ValidationLog) timestamp() int64 {
+	return l.Timestamp
 }
 
 func (l *ValidationLog) writeBasic(dst map[string]interface{}) {

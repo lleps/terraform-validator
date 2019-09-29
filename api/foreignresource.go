@@ -9,6 +9,7 @@ import (
 // ForeignResource defines an AWS resource that is outside terraform.
 type ForeignResource struct {
 	Id                  string
+	Timestamp           int64
 	DiscoveredTimestamp string // when this resource was discovered to be outside terraform
 	ResourceType        string // resource type (example ec2-instance, ec2-eip)
 	ResourceId          string // resource id (example i-abc123)
@@ -19,6 +20,7 @@ type ForeignResource struct {
 func newForeignResource(resourceType, resourceId, resourceDetails string) *ForeignResource {
 	return &ForeignResource{
 		Id:                  generateId(),
+		Timestamp:           generateTimestamp(),
 		DiscoveredTimestamp: time.Now().Format(timestampFormat),
 		ResourceType:        resourceType,
 		ResourceId:          resourceId,
@@ -30,6 +32,10 @@ func newForeignResource(resourceType, resourceId, resourceDetails string) *Forei
 
 func (r *ForeignResource) id() string {
 	return r.Id
+}
+
+func (r *ForeignResource) timestamp() int64 {
+	return r.Timestamp
 }
 
 func (r *ForeignResource) writeBasic(dst map[string]interface{}) {

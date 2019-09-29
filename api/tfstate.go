@@ -9,6 +9,7 @@ import (
 // for compliance periodically.
 type TFState struct {
 	Id                 string
+	Timestamp          int64
 	Bucket, Path       string   // s3 bucket and item
 	State              string   // the current state (in json)
 	ComplianceResult   string   // the output for the compliance tool
@@ -19,10 +20,11 @@ type TFState struct {
 
 func newTFState(bucket string, path string, tags []string) *TFState {
 	return &TFState{
-		Id:     generateId(),
-		Bucket: bucket,
-		Path:   path,
-		Tags:   tags,
+		Id:        generateId(),
+		Timestamp: generateTimestamp(),
+		Bucket:    bucket,
+		Path:      path,
+		Tags:      tags,
 	}
 }
 
@@ -30,6 +32,10 @@ func newTFState(bucket string, path string, tags []string) *TFState {
 
 func (state *TFState) id() string {
 	return state.Id
+}
+
+func (state *TFState) timestamp() int64 {
+	return state.Timestamp
 }
 
 func (state *TFState) writeBasic(dst map[string]interface{}) {

@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
-	"github.com/google/uuid"
 	"log"
 	"strings"
 	"time"
@@ -20,10 +19,6 @@ import (
 type database struct {
 	svc         *dynamodb.DynamoDB
 	tablePrefix string
-}
-
-func generateId() string {
-	return uuid.New().String()
 }
 
 // newDynamoDB creates a DynamoDB instance using the default aws authentication method.
@@ -99,10 +94,11 @@ func (db *database) insertOrUpdateGeneric(tableName string, item interface{}) er
 // loadAllGeneric provides a generic way to load all items from a table.
 func (db *database) loadAllGeneric(
 	tableName string,
-	attributes []string, // list of the item attribute names (apart from "Id")
+	attributes []string, // list of the item attribute names (apart from "Id" and "Timestamp")
 	onItemLoaded func(map[string]*dynamodb.AttributeValue) error, // called for each loaded item
 ) error {
-	projection := expression.NamesList(expression.Name("Id"))
+	// map automatically names that every restObject should contain
+	projection := expression.NamesList(expression.Name("Id"), expression.Name("Timestamp"))
 	for _, attr := range attributes {
 		projection = projection.AddNames(expression.Name(attr))
 	}
