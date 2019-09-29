@@ -7,7 +7,6 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"html"
 	"strings"
-	"time"
 )
 
 // ValidationLog stores a validation event information.
@@ -15,7 +14,6 @@ type ValidationLog struct {
 	Id            string
 	Timestamp     int64
 	Kind          string // "tfstate" or "validation".
-	DateTime      string // when this plan was validated
 	InputJson     string // the plan file json
 	Output        string // the compliance tool raw output
 	Details       string // For kind tfstate, is bucket:path.
@@ -33,7 +31,6 @@ func newValidationLog(inputJSON string, output string) *ValidationLog {
 		Id:        generateId(),
 		Timestamp: generateTimestamp(),
 		Kind:      logKindValidation,
-		DateTime:  time.Now().Format(timestampFormat),
 		InputJson: inputJSON,
 		Output:    output,
 	}
@@ -49,8 +46,8 @@ func newTFStateLog(
 ) *ValidationLog {
 	return &ValidationLog{
 		Id:            generateId(),
+		Timestamp:     generateTimestamp(),
 		Kind:          logKindTFState,
-		DateTime:      time.Now().Format(timestampFormat),
 		InputJson:     inputJSON,
 		Output:        output,
 		PrevInputJson: prevInputJSON,
@@ -71,7 +68,6 @@ func (l *ValidationLog) timestamp() int64 {
 
 func (l *ValidationLog) writeBasic(dst map[string]interface{}) {
 	dst["kind"] = l.Kind
-	dst["date_time"] = l.DateTime
 	dst["details"] = l.Details
 	parsed, _ := parseComplianceOutput(l.Output)
 	dst["compliance_errors"] = parsed.ErrorCount()
@@ -143,7 +139,7 @@ func diffsToPrettyHtml(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatc
 
 const validationLogTable = "logs"
 
-var validationLogAttributes = []string{"Kind", "DateTime", "InputJson", "Output", "Details", "PrevInputJson", "PrevOutput"}
+var validationLogAttributes = []string{"Kind", "InputJson", "Output", "Details", "PrevInputJson", "PrevOutput"}
 
 func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	var result []*ValidationLog

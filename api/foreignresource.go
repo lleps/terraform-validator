@@ -3,28 +3,25 @@ package main
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"time"
 )
 
 // ForeignResource defines an AWS resource that is outside terraform.
 type ForeignResource struct {
-	Id                  string
-	Timestamp           int64
-	DiscoveredTimestamp string // when this resource was discovered to be outside terraform
-	ResourceType        string // resource type (example ec2-instance, ec2-eip)
-	ResourceId          string // resource id (example i-abc123)
-	ResourceDetails     string // type-specific details
-	IsException         bool   // if the resource is intentionally ok being outside terraform.
+	Id              string
+	Timestamp       int64
+	ResourceType    string // resource type (example ec2-instance, ec2-eip)
+	ResourceId      string // resource id (example i-abc123)
+	ResourceDetails string // type-specific details
+	IsException     bool   // if the resource is intentionally ok being outside terraform.
 }
 
 func newForeignResource(resourceType, resourceId, resourceDetails string) *ForeignResource {
 	return &ForeignResource{
-		Id:                  generateId(),
-		Timestamp:           generateTimestamp(),
-		DiscoveredTimestamp: time.Now().Format(timestampFormat),
-		ResourceType:        resourceType,
-		ResourceId:          resourceId,
-		ResourceDetails:     resourceDetails,
+		Id:              generateId(),
+		Timestamp:       generateTimestamp(),
+		ResourceType:    resourceType,
+		ResourceId:      resourceId,
+		ResourceDetails: resourceDetails,
 	}
 }
 
@@ -39,7 +36,6 @@ func (r *ForeignResource) timestamp() int64 {
 }
 
 func (r *ForeignResource) writeBasic(dst map[string]interface{}) {
-	dst["date_time"] = r.DiscoveredTimestamp
 	dst["resource_id"] = r.ResourceId
 	dst["resource_type"] = r.ResourceType
 	dst["resource_details"] = r.ResourceDetails
@@ -54,7 +50,7 @@ func (r *ForeignResource) writeDetailed(dst map[string]interface{}) {
 
 const foreignResourcesTable = "foreignresources"
 
-var foreignResourcesAttributes = []string{"DiscoveredTimestamp", "ResourceType", "ResourceId", "ResourceDetails", "IsException"}
+var foreignResourcesAttributes = []string{"ResourceType", "ResourceId", "ResourceDetails", "IsException"}
 
 func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	var result []*ForeignResource

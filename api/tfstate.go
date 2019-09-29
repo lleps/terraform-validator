@@ -20,11 +20,12 @@ type TFState struct {
 
 func newTFState(bucket string, path string, tags []string) *TFState {
 	return &TFState{
-		Id:        generateId(),
-		Timestamp: generateTimestamp(),
-		Bucket:    bucket,
-		Path:      path,
-		Tags:      tags,
+		Id:         generateId(),
+		Timestamp:  generateTimestamp(),
+		LastUpdate: "never",
+		Bucket:     bucket,
+		Path:       path,
+		Tags:       tags,
 	}
 }
 
