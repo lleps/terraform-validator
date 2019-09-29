@@ -243,9 +243,7 @@ export class TFStatesTable extends React.Component {
                 <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell>Bucket</TableCell>
-                            <TableCell>Path</TableCell>
-                            <TableCell>Tags</TableCell>
+                            <TableCell>Bucket@Path</TableCell>
                             <TableCell>Last Update</TableCell>
                             <TableCell>Compliant</TableCell>
                             <TableCell align="right"/>
@@ -255,8 +253,7 @@ export class TFStatesTable extends React.Component {
                         { this.state.tfstates
                             .map(l => (
                                 <TableRow key={l.id}>
-                                    <TableCell>{l.bucket}</TableCell>
-                                    <TableCell>{l.path}</TableCell>
+                                    <TableCell>{l.bucket}<b>@</b>{l.path}</TableCell>
                                     <TableCell>
                                         <TagList tags={l.tags}/>
                                     </TableCell>
