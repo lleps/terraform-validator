@@ -19,10 +19,7 @@ import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import {DeleteDialog} from "./DeleteDialog";
 import {Account, TagList, TagListField} from "./TagList";
-import {TimeAgo} from "./Time";
-import Select from "@material-ui/core/Select";
-import MenuItem from "@material-ui/core/MenuItem";
-import GridList from "@material-ui/core/GridList";
+import {SelectAccount} from "./Account";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
@@ -142,7 +139,7 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
 
 function LastUpdateLabel(data) {
     if (data.last_update === "") {
-        return <span>never</span>;
+        return <span>-</span>;
     }
     return <span>{data.last_update}</span>;
 }
@@ -150,12 +147,12 @@ function LastUpdateLabel(data) {
 function TableEntryComplianceLabel(data) {
     if (data.compliance_present === true) {
         if (data.compliance_errors === 0) {
-            return <Typography color="primary" component="body1">yes {data.compliance_tests}/{data.compliance_tests}</Typography>
+            return <Typography color="primary" component="body1">{data.compliance_tests}/{data.compliance_tests}</Typography>
         } else {
-            return <Typography color="secondary" component="body1">no {data.compliance_tests-data.compliance_errors}/{data.compliance_tests}</Typography>
+            return <Typography color="secondary" component="body1">{data.compliance_tests-data.compliance_errors}/{data.compliance_tests}</Typography>
         }
     } else {
-        return <Typography>unchecked</Typography>
+        return <Typography>-</Typography>
     }
 }
 
@@ -220,22 +217,6 @@ function TableEntryComplianceTooltip(data) {
             <Info/>
         </Tooltip>
     );
-}
-
-
-function SelectAccount({ objs, selected, onSelect }) {
-    let accounts = objs.map(o => o.account).filter(o => o !== "");
-    let unique = [...new Set(accounts)];
-    return <Select
-        value={selected}
-        onChange={e => onSelect(e.target.value)}
-    >
-        <MenuItem value={"All"}>All</MenuItem>
-        {unique.map((e) =>
-            <MenuItem value={e}>{e}</MenuItem>
-
-        )}
-    </Select>
 }
 
 export class TFStatesTable extends React.Component {

@@ -108,7 +108,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
                 setLoading(false);
             })
             .catch(err => console.log("error getting details: " + err));
-    });
+    }, []);
 
     function save() {
         setSaving(true);

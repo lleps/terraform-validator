@@ -17,11 +17,13 @@ import DialogTitle from "@material-ui/core/DialogTitle";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import {TimeAgo} from "./Time";
+import {Account} from "./TagList";
+import {SelectAccount} from "./Account";
 
 export class LogDetailsDialog extends React.Component {
     state = {
         details: null,
-        diffHtml: ""
+        diffHtml: "",
     };
 
     componentDidMount() {
@@ -164,6 +166,7 @@ function LogTableColumns(kind) {
     if (kind === "tfstate") {
         return (
             <React.Fragment>
+                <TableCell>Account</TableCell>
                 <TableCell><AccessTime/></TableCell>
                 <TableCell>Bucket:Path</TableCell>
                 <TableCell>Type</TableCell>
@@ -184,6 +187,7 @@ function LogTableCells(l) {
     if (l.kind === "tfstate") {
         return (
             <React.Fragment>
+                <TableCell><Account account={l.account}/></TableCell>
                 <TableCell><TimeAgo timestamp={l.timestamp}/></TableCell>
                 <TableCell>{l.details}</TableCell>
                 <TableCell>{LinesChangedLabel(l)}</TableCell>
@@ -204,6 +208,7 @@ export class LogsTable extends React.Component {
     state = {
         logs: [],
         updating: false,
+        account: "All",
     };
 
     fetchData() {
@@ -223,7 +228,16 @@ export class LogsTable extends React.Component {
     render() {
         return (
             <React.Fragment>
-                <Title>Latest {this.props.kind === "tfstate" ? "State Changes" : "Validations"}</Title>
+                <div>
+                    <Title>Latest {this.props.kind === "tfstate" ? "State Changes" : "Validations"}</Title>
+                    { this.props.kind === "tfstate" ?
+                        <SelectAccount
+                            objs={this.state.logs}
+                            selected={this.state.account}
+                            onSelect={v => this.setState({ account: v })}
+                        />
+                        : ""}
+                </div>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
@@ -233,6 +247,7 @@ export class LogsTable extends React.Component {
                     </TableHead>
                     <TableBody>
                         { this.state.logs
+                            .filter(l => this.state.account === "All" || this.state.account === l.account)
                             .filter(l => l.kind === this.props.kind)
                             .map(l =>
                                 <TableRow key={l.id}>
