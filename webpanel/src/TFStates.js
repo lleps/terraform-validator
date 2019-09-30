@@ -20,6 +20,9 @@ import DialogActions from "@material-ui/core/DialogActions";
 import {DeleteDialog} from "./DeleteDialog";
 import {Account, TagList, TagListField} from "./TagList";
 import {TimeAgo} from "./Time";
+import Select from "@material-ui/core/Select";
+import MenuItem from "@material-ui/core/MenuItem";
+import GridList from "@material-ui/core/GridList";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
@@ -219,11 +222,28 @@ function TableEntryComplianceTooltip(data) {
     );
 }
 
+
+function SelectAccount({ objs, selected, onSelect }) {
+    let accounts = objs.map(o => o.account).filter(o => o !== "");
+    let unique = [...new Set(accounts)];
+    return <Select
+        value={selected}
+        onChange={e => onSelect(e.target.value)}
+    >
+        <MenuItem value={"All"}>All</MenuItem>
+        {unique.map((e) =>
+            <MenuItem value={e}>{e}</MenuItem>
+
+        )}
+    </Select>
+}
+
 export class TFStatesTable extends React.Component {
     state = {
         tfstates: [],
         deleting: null,
-        updating: false
+        updating: false,
+        account: "All",
     };
 
     fetchData() {
@@ -253,7 +273,16 @@ export class TFStatesTable extends React.Component {
                     }}/> : ""
                 }
 
-                <Title>Terraform States</Title>
+                <div>
+                    <Title>Terraform States</Title>
+                    <div/>
+                    <SelectAccount
+                        objs={this.state.tfstates}
+                        selected={this.state.account}
+                        onSelect={v => this.setState({ account: v })}
+                    />
+                    <div/>
+                </div>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
@@ -267,6 +296,7 @@ export class TFStatesTable extends React.Component {
                     </TableHead>
                     <TableBody>
                         { this.state.tfstates
+                            .filter(s => this.state.account === "All" || this.state.account === s.account)
                             .map(l => (
                                 <TableRow key={l.id}>
                                     <TableCell><Account account={l.account}/></TableCell>
