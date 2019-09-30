@@ -1,6 +1,10 @@
 import React from "react";
-import ReactTimeAgoWithTooltip from "react-time-ago/modules/ReactTimeAgoWithTooltip";
+import ReactTimeAgo from "react-time-ago/modules/ReactTimeAgo";
 
 export function TimeAgo({ timestamp }) {
-    return <ReactTimeAgoWithTooltip date={timestamp/1000}/>
+    if (timestamp <= 0 || timestamp === undefined) {
+        return <span>Not set</span>
+    }
+
+    return <ReactTimeAgo date={timestamp*1000}/>
 }

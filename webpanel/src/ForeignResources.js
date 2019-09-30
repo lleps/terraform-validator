@@ -33,7 +33,7 @@ export class ForeignResourcesTable extends React.Component {
                 <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell>Date</TableCell>
+                            <TableCell>Discovered</TableCell>
                             <TableCell>Type</TableCell>
                             <TableCell>Resource</TableCell>
                         </TableRow>

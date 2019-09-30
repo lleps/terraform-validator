@@ -3,16 +3,16 @@ import InputAdornment from "@material-ui/core/InputAdornment";
 import {Label} from "@material-ui/icons";
 import TextField from "@material-ui/core/TextField";
 
-String.prototype.hashCode = function() {
+function strHash(s) {
     let hash = 0, i, chr;
-    if (this.length === 0) return hash;
-    for (i = 0; i < this.length; i++) {
-        chr   = this.charCodeAt(i);
+    if (s.length === 0) return hash;
+    for (i = 0; i < s.length; i++) {
+        chr   = s.charCodeAt(i);
         hash  = ((hash << 5) - hash) + chr;
         hash |= 0; // Convert to 32bit integer
     }
     return hash;
-};
+}
 
 export function TagListField({ tags, onChange }) {
     return (
@@ -42,7 +42,7 @@ export function TagListField({ tags, onChange }) {
 
 export function Tag({ tag }) {
     let tagColorCount = 20; // colors defined in index.css as label-{0-19}
-    return <span><span className={"label label-" + (tag.hashCode() % tagColorCount)}>{tag}</span>&nbsp;</span>
+    return <span><span className={"label label-" + (strHash(tag) % tagColorCount)}>{tag}</span>&nbsp;</span>
 }
 
 export function TagList({ tags }) {

@@ -8,7 +8,7 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import {Delete, Info, TrendingFlat} from "@material-ui/icons";
+import {AccessTime, Info, TrendingFlat} from "@material-ui/icons";
 import axios from 'axios';
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
@@ -19,10 +19,6 @@ import IconButton from "@material-ui/core/IconButton";
 import {TimeAgo} from "./Time";
 
 export class LogDetailsDialog extends React.Component {
-    constructor(props) {
-        super(props);
-    }
-
     state = {
         details: null,
         diffHtml: ""
@@ -42,15 +38,17 @@ export class LogDetailsDialog extends React.Component {
         if (this.state.details !== null) {
             let featuresNow = this.state.details.compliance_features;
             let featuresPrev = this.state.details.compliance_features_prev;
+
             if (featuresNow != null) {
-                for (let f in featuresNow) {
-                    if (allFeatures.indexOf(f) === -1) allFeatures.push(f);
-                }
+                featuresNow.forEach(feature => {
+                    if (allFeatures.indexOf(feature) === -1) allFeatures.push(feature);
+                });
             }
+
             if (featuresPrev != null) {
-                for (let f in featuresPrev) {
-                    if (allFeatures.indexOf(f) === -1) allFeatures.push(f);
-                }
+                featuresPrev.forEach(feature => {
+                    if (allFeatures.indexOf(feature) === -1) allFeatures.push(feature);
+                });
             }
         }
 
@@ -166,7 +164,7 @@ function LogTableColumns(kind) {
     if (kind === "tfstate") {
         return (
             <React.Fragment>
-                <TableCell>Date</TableCell>
+                <TableCell><AccessTime/></TableCell>
                 <TableCell>Bucket:Path</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Compliance</TableCell>
@@ -175,7 +173,7 @@ function LogTableColumns(kind) {
     } else {
         return (
             <React.Fragment>
-                <TableCell>Date</TableCell>
+                <TableCell><AccessTime/></TableCell>
                 <TableCell>Compliance</TableCell>
             </React.Fragment>
         );
@@ -195,7 +193,7 @@ function LogTableCells(l) {
     } else {
         return (
             <React.Fragment>
-                <TableCell><TimeAgo date={l.timestamp}/></TableCell>
+                <TableCell><TimeAgo timestamp={l.timestamp}/></TableCell>
                 <TableCell>{ValidationState(l)}</TableCell>
             </React.Fragment>
         );
@@ -203,10 +201,6 @@ function LogTableCells(l) {
 }
 
 export class LogsTable extends React.Component {
-    constructor(props) {
-        super(props);
-    }
-
     state = {
         logs: [],
         updating: false,

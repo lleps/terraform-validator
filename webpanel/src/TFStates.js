@@ -9,7 +9,7 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
-import {AccessTime, Delete, Edit, Info, Label} from "@material-ui/icons";
+import {Delete, Edit, Info} from "@material-ui/icons";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import Dialog from "@material-ui/core/Dialog";
@@ -40,7 +40,7 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
                 })
                 .catch(err => console.log("error getting details: " + err));
         }
-    }, []);
+    }, [editMode, id]);
 
     function onClickOk() {
         let body = {
@@ -244,8 +244,9 @@ export class TFStatesTable extends React.Component {
                 <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell><AccessTime/></TableCell>
+                            <TableCell>Added</TableCell>
                             <TableCell>Bucket@Path</TableCell>
+                            <TableCell>Tags</TableCell>
                             <TableCell>Last Update</TableCell>
                             <TableCell>Compliant</TableCell>
                             <TableCell align="right"/>

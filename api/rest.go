@@ -80,7 +80,7 @@ type ByRestObject []restObject
 func (a ByRestObject) Len() int      { return len(a) }
 func (a ByRestObject) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a ByRestObject) Less(i, j int) bool {
-	return a[i].timestamp() < a[j].timestamp()
+	return a[i].timestamp() > a[j].timestamp()
 }
 
 // restObjectHandler contains the handlers that effectively perform the operations.
@@ -105,6 +105,9 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
 
+			// sort the list by timestamp
+			sort.Sort(ByRestObject(objs))
+
 			// Returns a list of json objects.
 			result := make([]interface{}, 0)
 			for _, o := range objs {
@@ -114,9 +117,6 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 				o.writeBasic(dst)
 				result = append(result, dst)
 			}
-
-			// sort the list by timestamp
-			sort.Sort(ByRestObject(objs))
 
 			// jsonify and return
 			asJSON, err := json.MarshalIndent(result, "", "\t")

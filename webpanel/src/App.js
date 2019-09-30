@@ -4,7 +4,7 @@ import {BrowserRouter as Router, Redirect, Route} from "react-router-dom";
 import Navigation from "./Navigation";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
-import {LogDetailsDialog, LogsTable, ValidationLogsTable} from "./Logs";
+import {LogDetailsDialog, LogsTable} from "./Logs";
 import {FeatureAddDialog, FeatureEditDialog, FeaturesTable} from "./Features";
 import {TFStateDialog, TFStatesTable} from "./TFStates";
 import {ForeignResourcesTable} from "./ForeignResources";
@@ -33,7 +33,7 @@ function Logs(props) {
                     onSelectInfo={(id) => props.history.push("/logs/" + id) }
                 />
             </Paper>
-            <li></li>
+            <li/>
             <Paper className={classes.paper}>
                 <LogsTable
                     kind="validation"

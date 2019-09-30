@@ -13,11 +13,10 @@ import DialogContent from "@material-ui/core/DialogContent";
 import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import axios from 'axios';
-import {AccountCircle, Delete, Edit, Label} from "@material-ui/icons";
+import {Delete, Edit} from "@material-ui/icons";
 import IconButton from "@material-ui/core/IconButton";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import {DeleteDialog} from "./DeleteDialog";
-import InputAdornment from "@material-ui/core/InputAdornment";
 import {TagList, TagListField} from "./TagList";
 
 export function FeatureAddDialog({ onAdd, onCancel }) {
@@ -109,7 +108,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
                 setLoading(false);
             })
             .catch(err => console.log("error getting details: " + err));
-    }, []);
+    });
 
     function save() {
         setSaving(true);
