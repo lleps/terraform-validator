@@ -18,11 +18,12 @@ import DialogContent from "@material-ui/core/DialogContent";
 import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
 import {DeleteDialog} from "./DeleteDialog";
-import {TagList, TagListField} from "./TagList";
+import {Account, TagList, TagListField} from "./TagList";
 import {TimeAgo} from "./Time";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
+    const [account, setAccount] = React.useState("");
     const [bucket, setBucket] = React.useState("");
     const [path, setPath] = React.useState("");
     const [inputError, setInputError] = React.useState("");
@@ -33,6 +34,7 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
             setLoading(true);
             axios.get("/tfstates/" + id)
                 .then(res => {
+                    setAccount(res.data.account);
                     setPath(res.data.path);
                     setBucket(res.data.bucket);
                     setTags(res.data.tags || []);
@@ -44,6 +46,7 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
 
     function onClickOk() {
         let body = {
+            account: account,
             bucket: bucket,
             path: path,
             tags: tags
@@ -80,14 +83,24 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     }
 
     function inputNotEmpty() {
-        return bucket.length > 0 && path.length > 0;
+        return account.length > 0 && bucket.length > 0 && path.length > 0;
     }
-
 
     return <Dialog open={true} onClose={() => onCancel()}>
             <DialogTitle>{editMode ? "Edit" : "Add"} TFState</DialogTitle>
             <DialogContent>
                 { loading ? <div align={"center"}><CircularProgress/></div> : "" }
+                <TextField
+                    autoComplete="off"
+                    autoFocus
+                    value={account}
+                    margin="dense"
+                    id="account"
+                    label="Account Alias"
+                    onChange={e => setAccount(e.target.value)}
+                    type="text"
+                    fullWidth
+                />
                 <TextField
                     autoComplete="off"
                     autoFocus
@@ -244,7 +257,7 @@ export class TFStatesTable extends React.Component {
                 <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell>Added</TableCell>
+                            <TableCell>Account</TableCell>
                             <TableCell>Bucket@Path</TableCell>
                             <TableCell>Tags</TableCell>
                             <TableCell>Last Update</TableCell>
@@ -256,7 +269,7 @@ export class TFStatesTable extends React.Component {
                         { this.state.tfstates
                             .map(l => (
                                 <TableRow key={l.id}>
-                                    <TableCell><TimeAgo timestamp={l.timestamp}/></TableCell>
+                                    <TableCell><Account account={l.account}/></TableCell>
                                     <TableCell>{l.bucket}<b>@</b>{l.path}</TableCell>
                                     <TableCell>
                                         <TagList tags={l.tags}/>

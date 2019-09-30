@@ -24,6 +24,36 @@ body {
   padding: 7px;
 }
 
+.account {
+  border-radius: 7px;
+  font-weight: bold;
+  font-size: 12px;
+  padding: 5px;
+}
+
+/* colors for different account borders */
+.account-0 { border: 2px solid #000000; color: #000000; }
+.account-1 { border: 2px solid #B71C1C; color: #B71C1C; }
+.account-2 { border: 2px solid #880E4F; color: #880E4F; }
+.account-3 { border: 2px solid #4A148C; color: #4A148C; }
+.account-4 { border: 2px solid #311B92; color: #311B92; }
+.account-5 { border: 2px solid #1A237E; color: #1A237E; }
+.account-6 { border: 2px solid #0D47A1; color: #0D47A1; }
+.account-7 { border: 2px solid #01579B; color: #01579B; }
+.account-8 { border: 2px solid #006064; color: #006064; }
+.account-9 { border: 2px solid #004D40; color: #004D40; }
+.account-10 { border: 2px solid #1B5E20; color: #1B5E20; }
+.account-11 { border: 2px solid #33691E; color: #33691E; }
+.account-12 { border: 2px solid #827717; color: #827717; }
+.account-13 { border: 2px solid #F57F17; color: #F57F17; }
+.account-14 { border: 2px solid #FF6F00; color: #FF6F00; }
+.account-15 { border: 2px solid #E65100; color: #E65100; }
+.account-16 { border: 2px solid #BF360C; color: #BF360C; }
+.account-17 { border: 2px solid #3E2723; color: #3E2723; }
+.account-18 { border: 2px solid #212121; color: #212121; }
+.account-19 { border: 2px solid #263238; color: #263238; }
+
+
 /* colors for different label backgrounds */
 .label-0 { background: #000000; }
 .label-1 { background: #B71C1C; }

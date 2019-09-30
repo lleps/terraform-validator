@@ -10,6 +10,7 @@ import (
 type TFState struct {
 	Id                 string
 	Timestamp          int64
+	Account            string   // to categorize states
 	Bucket, Path       string   // s3 bucket and item
 	State              string   // the current state (in json)
 	ComplianceResult   string   // the output for the compliance tool
@@ -18,14 +19,15 @@ type TFState struct {
 	Tags               []string // to specify by which features this state should be checked
 }
 
-func newTFState(bucket string, path string, tags []string) *TFState {
+func newTFState(account string, bucket string, path string, tags []string) *TFState {
 	return &TFState{
 		Id:         generateId(),
 		Timestamp:  generateTimestamp(),
-		LastUpdate: "never",
+		Account:    account,
 		Bucket:     bucket,
 		Path:       path,
 		Tags:       tags,
+		LastUpdate: "never",
 	}
 }
 
@@ -40,6 +42,7 @@ func (state *TFState) timestamp() int64 {
 }
 
 func (state *TFState) writeBasic(dst map[string]interface{}) {
+	dst["account"] = state.Account
 	dst["path"] = state.Path
 	dst["bucket"] = state.Bucket
 	dst["last_update"] = state.LastUpdate
@@ -70,7 +73,7 @@ func (state *TFState) writeDetailed(dst map[string]interface{}) {
 
 const tfStateTable = "tfstates"
 
-var tfStateAttributes = []string{"Bucket", "Path", "State", "ComplianceResult", "LastUpdate", "S3LastModification", "Tags"}
+var tfStateAttributes = []string{"Account", "Bucket", "Path", "State", "ComplianceResult", "LastUpdate", "S3LastModification", "Tags"}
 
 func (db *database) loadAllTFStates() ([]*TFState, error) {
 	var result []*TFState

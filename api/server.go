@@ -265,19 +265,20 @@ func initEndpoints(db *database) *mux.Router {
 		deleteHandler: func(db *database, id string) error { return db.removeTFState(id) },
 		postHandler: func(db *database, body string) (restObject, error) {
 			type BodyFields struct {
-				Bucket string   `json:"bucket"`
-				Path   string   `json:"path"`
-				Tags   []string `json:"tags"`
+				Account string   `json:"account"`
+				Bucket  string   `json:"bucket"`
+				Path    string   `json:"path"`
+				Tags    []string `json:"tags"`
 			}
 			var f BodyFields
 			if err := json.Unmarshal([]byte(body), &f); err != nil {
 				return nil, fmt.Errorf("can't unmarshal into f: %v", err)
 			}
-			if f.Bucket == "" || f.Path == "" {
-				return nil, fmt.Errorf("'bucket' or 'path' not given")
+			if f.Account == "" || f.Bucket == "" || f.Path == "" {
+				return nil, fmt.Errorf("'account', 'bucket' or 'path' not given")
 			}
 
-			tfstate := newTFState(f.Bucket, f.Path, f.Tags)
+			tfstate := newTFState(f.Account, f.Bucket, f.Path, f.Tags)
 			if err := db.insertOrUpdateTFState(tfstate); err != nil {
 				return nil, err
 			}
@@ -286,19 +287,21 @@ func initEndpoints(db *database) *mux.Router {
 		},
 		putHandler: func(db *database, obj restObject, body string) error {
 			type BodyFields struct {
-				Bucket string   `json:"bucket"`
-				Path   string   `json:"path"`
-				Tags   []string `json:"tags"`
+				Account string   `json:"account"`
+				Bucket  string   `json:"bucket"`
+				Path    string   `json:"path"`
+				Tags    []string `json:"tags"`
 			}
 			var f BodyFields
 			if err := json.Unmarshal([]byte(body), &f); err != nil {
 				return fmt.Errorf("can't unmarshal into f: %v", err)
 			}
-			if f.Bucket == "" || f.Path == "" {
-				return fmt.Errorf("'bucket' or 'path' not given")
+			if f.Account == "" || f.Bucket == "" || f.Path == "" {
+				return fmt.Errorf("'account', 'bucket' or 'path' not given")
 			}
 
 			tfstate := obj.(*TFState)
+			tfstate.Account = f.Account
 			tfstate.Bucket = f.Bucket
 			tfstate.Path = f.Path
 			tfstate.Tags = f.Tags

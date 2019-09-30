@@ -40,13 +40,23 @@ export function TagListField({ tags, onChange }) {
     )
 }
 
+/**
+ * @return {number}
+ */
+function MapIdx(string, count) {
+    return Math.abs(strHash(string) % count)
+}
+
 export function Tag({ tag }) {
-    let tagColorCount = 20; // colors defined in index.css as label-{0-19}
-    return <span><span className={"label label-" + (strHash(tag) % tagColorCount)}>{tag}</span>&nbsp;</span>
+    return <span><span className={"label label-" + MapIdx(tag,20)}>{tag}</span>&nbsp;</span>
+}
+
+export function Account({ account }) {
+    return <span className={"account account-" + MapIdx(account,20)}>{account}</span>
 }
 
 export function TagList({ tags }) {
     return <div>
-        {(tags || []).map((t,idx) => <span><Tag tag={t}/>{idx%7===6 ? <br/> : ""}</span>) }
+        {(tags || []).map((t,idx) => <span><Tag tag={t}/>{idx%3===2 ? <br/> : ""}</span>) }
     </div>
 }
