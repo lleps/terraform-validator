@@ -16,6 +16,7 @@ type ValidationLog struct {
 	Kind          string // "tfstate" or "validation".
 	InputJson     string // the plan file json
 	Output        string // the compliance tool raw output
+	Account       string // For kind tfstate, the account affected.
 	Details       string // For kind tfstate, is bucket:path.
 	PrevInputJson string // for Kind tfstate, the previous json input.
 	PrevOutput    string // For Kind tfstate, the previous compliance output.
@@ -41,6 +42,7 @@ func newTFStateLog(
 	output string,
 	prevInputJSON string,
 	prevOutput string,
+	account string,
 	bucket string,
 	path string,
 ) *ValidationLog {
@@ -52,6 +54,7 @@ func newTFStateLog(
 		Output:        output,
 		PrevInputJson: prevInputJSON,
 		PrevOutput:    prevOutput,
+		Account:       account,
 		Details:       bucket + ":" + path,
 	}
 }
@@ -76,6 +79,7 @@ func (l *ValidationLog) writeBasic(dst map[string]interface{}) {
 	dst["compliance_tests_prev"] = 0
 
 	if l.Kind == "tfstate" {
+		dst["account"] = l.Account
 		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
 		dst["lines_added"] = len(added)
 		dst["lines_removed"] = len(removed)
@@ -139,7 +143,7 @@ func diffsToPrettyHtml(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatc
 
 const validationLogTable = "logs"
 
-var validationLogAttributes = []string{"Kind", "InputJson", "Output", "Details", "PrevInputJson", "PrevOutput"}
+var validationLogAttributes = []string{"Kind", "InputJson", "Output", "Account", "Details", "PrevInputJson", "PrevOutput"}
 
 func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	var result []*ValidationLog

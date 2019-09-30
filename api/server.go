@@ -359,7 +359,7 @@ func checkTFState(sess *session.Session, db *database, state *TFState) (changed 
 
 	// Register the log entry
 	now := time.Now().Format(timestampFormat)
-	logEntry = newTFStateLog(actualState, output, state.State, state.ComplianceResult, state.Bucket, state.Path)
+	logEntry = newTFStateLog(actualState, output, state.State, state.ComplianceResult, state.Account, state.Bucket, state.Path)
 	if err := db.insertLog(logEntry); err != nil {
 		return true, nil, fmt.Errorf("can't insert logEntry on DB: %v", err)
 	}
