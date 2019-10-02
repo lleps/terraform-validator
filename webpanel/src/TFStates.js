@@ -100,10 +100,10 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
                     onChange={e => setAccount(e.target.value)}
                     type="text"
                     fullWidth
+                    disabled={loading}
                 />
                 <TextField
                     autoComplete="off"
-                    autoFocus
                     value={bucket}
                     margin="dense"
                     id="bucket"
@@ -111,6 +111,7 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
                     onChange={handleBucketChange}
                     type="text"
                     fullWidth
+                    disabled={loading}
                 />
                 <TextField
                     autoComplete="off"
@@ -123,6 +124,7 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
                     helperText={inputError}
                     type="text"
                     fullWidth
+                    disabled={loading}
                 />
                 <TagListField tags={tags} onChange={(t) => setTags(t)}/>
             </DialogContent>

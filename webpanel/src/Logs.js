@@ -42,15 +42,15 @@ export class LogDetailsDialog extends React.Component {
             let featuresPrev = this.state.details.compliance_features_prev;
 
             if (featuresNow != null) {
-                featuresNow.forEach(feature => {
+                for (const feature in featuresNow) {
                     if (allFeatures.indexOf(feature) === -1) allFeatures.push(feature);
-                });
+                }
             }
 
             if (featuresPrev != null) {
-                featuresPrev.forEach(feature => {
+                for (const feature in featuresPrev) {
                     if (allFeatures.indexOf(feature) === -1) allFeatures.push(feature);
-                });
+                }
             }
         }
 
