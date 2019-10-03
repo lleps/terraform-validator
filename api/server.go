@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -15,18 +17,17 @@ import (
 )
 
 var (
-	listenFlag       = flag.String("listen", ":8080", "On which address to listen")
-	dynamoPrefixFlag = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
-	timestampFormat  = time.Stamp
+	listenFlag             = flag.String("listen", ":8080", "On which address to listen")
+	dynamoPrefixFlag       = flag.String("dynamodb-prefix", "terraformvalidator", "The database table prefix to use")
+	awsUseSharedConfig     = flag.Bool("aws-use-sharedconfig", false, "Use shared config files in AWS session")
+	awsRegionFlag          = flag.String("aws-region", "", "AWS region to use for the session")
+	awsAccessKeyIdFlag     = flag.String("aws-access-key-id", "", "credentials aws_access_key_id parameter")
+	awsSecretAccessKeyFlag = flag.String("aws-secret-access-key", "", "credentials aws_secret_access_key")
+	timestampFormat        = time.Stamp
 )
 
 func main() {
-	flag.Parse()
-
-	log.Println("Init aws session... (using shared config)")
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
+	sess := createSession()
 
 	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
 	db := initDB(sess, *dynamoPrefixFlag)
@@ -53,6 +54,38 @@ type LogWriter struct{}
 func (_ LogWriter) Write(bytes []byte) (n int, err error) {
 	log.Print(string(bytes))
 	return
+}
+
+func createSession() *session.Session {
+	flag.Parse()
+
+	if *awsUseSharedConfig {
+		log.Println("Init aws session... (using shared config)")
+		return session.Must(session.NewSessionWithOptions(session.Options{
+			SharedConfigState: session.SharedConfigEnable,
+		}))
+	} else {
+		log.Println("Init aws session... (using given flags)")
+		flags := map[string]string{
+			"region":            *awsRegionFlag,
+			"access-key-id":     *awsAccessKeyIdFlag,
+			"secret-access-key": *awsSecretAccessKeyFlag,
+		}
+		for f, v := range flags {
+			if v == "" {
+				log.Fatalf("Error: Some flag not given for aws authentication: -aws-" + f)
+			}
+		}
+		config := aws.Config{
+			Region: aws.String(flags["region"]),
+			Credentials: credentials.NewStaticCredentialsFromCreds(
+				credentials.Value{
+					AccessKeyID:     flags["access-key-id"],
+					SecretAccessKey: flags["secret-access-key"],
+				}),
+		}
+		return session.Must(session.NewSessionWithOptions(session.Options{Config: config}))
+	}
 }
 
 func initDB(sess *session.Session, prefix string) *database {
