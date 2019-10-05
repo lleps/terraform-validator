@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
 // ForeignResource defines an AWS resource that is outside terraform.
@@ -57,7 +58,8 @@ func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	err := db.loadGeneric(
 		db.tableFor(foreignResourcesTable),
 		foreignResourcesAttributes,
-		nil,
+		false,
+		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ForeignResource
 			err := dynamodbattribute.UnmarshalMap(i, &elem)

@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
 // TFState defines a remote TF state that must be checked
@@ -85,7 +86,8 @@ func (db *database) findTFStateById(id string) (*TFState, error) {
 	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
 		tfStateAttributes,
-		nil,
+		true,
+		expression.Name("Id").Equal(expression.Value(id)),
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem TFState
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
@@ -103,7 +105,8 @@ func (db *database) loadAllTFStates() ([]*TFState, error) {
 	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
 		tfStateAttributes,
-		nil,
+		false,
+		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem TFState
 			err := dynamodbattribute.UnmarshalMap(i, &elem)

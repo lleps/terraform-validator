@@ -91,11 +91,13 @@ func (db *database) insertOrUpdateGeneric(tableName string, item interface{}) er
 	return nil
 }
 
-// loadGeneric provides a generic way to load all items from a table.
+// loadGeneric loads all items from a table, filtering with the given
+// condition only if useCondition flag is true.
 func (db *database) loadGeneric(
 	tableName string,
 	attributes []string, // list of the item attribute names (apart from "Id" and "Timestamp")
-	conditionOrNil *expression.ConditionBuilder, // an optional filter for elements
+	useCondition bool,
+	condition expression.ConditionBuilder, // an optional filter for elements
 	onItemLoaded func(map[string]*dynamodb.AttributeValue) error, // called for each loaded item
 ) error {
 	projection := expression.NamesList(expression.Name("Id"), expression.Name("Timestamp"))
@@ -104,9 +106,10 @@ func (db *database) loadGeneric(
 	}
 
 	builder := expression.NewBuilder().WithProjection(projection)
-	if conditionOrNil != nil {
-		builder = builder.WithCondition(*conditionOrNil)
+	if useCondition {
+		builder = builder.WithFilter(condition)
 	}
+
 	expr, err := builder.Build()
 	if err != nil {
 		return err

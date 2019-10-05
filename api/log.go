@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"html"
 	"strings"
@@ -150,7 +151,8 @@ func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	err := db.loadGeneric(
 		db.tableFor(validationLogTable),
 		validationLogAttributes,
-		nil,
+		false,
+		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ValidationLog
 			err := dynamodbattribute.UnmarshalMap(i, &elem)

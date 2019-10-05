@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
 // ComplianceFeature stores a feature to test terraform code against.
@@ -56,7 +57,8 @@ func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	err := db.loadGeneric(
 		db.tableFor(complianceFeatureTable),
 		complianceFeatureAttributes,
-		nil,
+		false,
+		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ComplianceFeature
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
