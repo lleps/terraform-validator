@@ -53,9 +53,10 @@ var complianceFeatureAttributes = []string{"Name", "Source", "Tags"}
 
 func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	var result []*ComplianceFeature
-	err := db.loadAllGeneric(
+	err := db.loadGeneric(
 		db.tableFor(complianceFeatureTable),
 		complianceFeatureAttributes,
+		nil,
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ComplianceFeature
 			err := dynamodbattribute.UnmarshalMap(i, &elem)

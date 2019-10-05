@@ -183,6 +183,23 @@ func initLogsEndpoint(router *mux.Router, db *database) {
 }
 
 func initTFStatesEndpoint(router *mux.Router, db *database) {
+	// Forcefully validation endpoint
+	validationHandler := func(db *database, _ string, vars map[string]string) (string, int, error) {
+		obj, err := db.findTFStateById(vars["id"])
+		if err != nil {
+			return "", 0, fmt.Errorf("can't find obj: %v", err)
+		}
+		if obj == nil {
+			return "", http.StatusNotFound, nil
+		}
+		obj.ForceValidation = true
+		if err := db.insertOrUpdateTFState(obj); err != nil {
+			return "", 0, fmt.Errorf("can't save in db: %v", err)
+		}
+		return "", http.StatusOK, nil
+	}
+	registerEndpoint(router, db, "/tfstates/{id}/validate", validationHandler, "POST")
+
 	// '/tfstates' supports all methods.
 	registerObjEndpoints(router, "/tfstates", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {

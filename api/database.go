@@ -91,19 +91,23 @@ func (db *database) insertOrUpdateGeneric(tableName string, item interface{}) er
 	return nil
 }
 
-// loadAllGeneric provides a generic way to load all items from a table.
-func (db *database) loadAllGeneric(
+// loadGeneric provides a generic way to load all items from a table.
+func (db *database) loadGeneric(
 	tableName string,
 	attributes []string, // list of the item attribute names (apart from "Id" and "Timestamp")
+	conditionOrNil *expression.ConditionBuilder, // an optional filter for elements
 	onItemLoaded func(map[string]*dynamodb.AttributeValue) error, // called for each loaded item
 ) error {
-	// map automatically names that every restObject should contain
 	projection := expression.NamesList(expression.Name("Id"), expression.Name("Timestamp"))
 	for _, attr := range attributes {
 		projection = projection.AddNames(expression.Name(attr))
 	}
 
-	expr, err := expression.NewBuilder().WithProjection(projection).Build()
+	builder := expression.NewBuilder().WithProjection(projection)
+	if conditionOrNil != nil {
+		builder = builder.WithCondition(*conditionOrNil)
+	}
+	expr, err := builder.Build()
 	if err != nil {
 		return err
 	}

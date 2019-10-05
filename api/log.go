@@ -147,9 +147,10 @@ var validationLogAttributes = []string{"Kind", "InputJson", "Output", "Account",
 
 func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	var result []*ValidationLog
-	err := db.loadAllGeneric(
+	err := db.loadGeneric(
 		db.tableFor(validationLogTable),
 		validationLogAttributes,
+		nil,
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ValidationLog
 			err := dynamodbattribute.UnmarshalMap(i, &elem)

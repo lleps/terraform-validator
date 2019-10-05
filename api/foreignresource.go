@@ -54,9 +54,10 @@ var foreignResourcesAttributes = []string{"ResourceType", "ResourceId", "Resourc
 
 func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	var result []*ForeignResource
-	err := db.loadAllGeneric(
+	err := db.loadGeneric(
 		db.tableFor(foreignResourcesTable),
 		foreignResourcesAttributes,
+		nil,
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem ForeignResource
 			err := dynamodbattribute.UnmarshalMap(i, &elem)

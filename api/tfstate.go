@@ -80,11 +80,30 @@ var tfStateAttributes = []string{
 	"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
 }
 
-func (db *database) loadAllTFStates() ([]*TFState, error) {
-	var result []*TFState
-	err := db.loadAllGeneric(
+func (db *database) findTFStateById(id string) (*TFState, error) {
+	var result *TFState = nil
+	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
 		tfStateAttributes,
+		nil,
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem TFState
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				result = &elem
+			}
+			return err
+		})
+
+	return result, err
+}
+
+func (db *database) loadAllTFStates() ([]*TFState, error) {
+	var result []*TFState
+	err := db.loadGeneric(
+		db.tableFor(tfStateTable),
+		tfStateAttributes,
+		nil,
 		func(i map[string]*dynamodb.AttributeValue) error {
 			var elem TFState
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
