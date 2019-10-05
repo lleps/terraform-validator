@@ -16,6 +16,7 @@ type TFState struct {
 	ComplianceResult   string   // the output for the compliance tool
 	LastUpdate         string   // the last compliance check. "never" = not checked yet.
 	S3LastModification string   // the s3 item last modification (to avoid pulling the state when it doesn't change)
+	ForceValidation    bool     // if this state should be forcibly validated (omit change checks and doesn't wait)
 	Tags               []string // to specify by which features this state should be checked
 }
 
@@ -46,6 +47,7 @@ func (state *TFState) writeBasic(dst map[string]interface{}) {
 	dst["path"] = state.Path
 	dst["bucket"] = state.Bucket
 	dst["last_update"] = state.LastUpdate
+	dst["force_validation"] = state.ForceValidation
 	dst["tags"] = state.Tags
 	if state.ComplianceResult == "" {
 		dst["compliance_present"] = false
@@ -73,7 +75,10 @@ func (state *TFState) writeDetailed(dst map[string]interface{}) {
 
 const tfStateTable = "tfstates"
 
-var tfStateAttributes = []string{"Account", "Bucket", "Path", "State", "ComplianceResult", "LastUpdate", "S3LastModification", "Tags"}
+var tfStateAttributes = []string{
+	"Account", "Bucket", "Path", "State", "ComplianceResult",
+	"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+}
 
 func (db *database) loadAllTFStates() ([]*TFState, error) {
 	var result []*TFState

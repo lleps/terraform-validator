@@ -17,8 +17,8 @@ func TestConvertTerraformBinToJson(t *testing.T) {
 	planBytes, err := base64.StdEncoding.DecodeString(convertTFPlanDataB64)
 	require.Nil(t, err, "cant decode plan data")
 
-	asJson, err := convertTerraformBinToJson(planBytes)
-	require.Nil(t, err, "convertTerraformBinToJson failed")
+	asJson, err := convertTerraformBinToJSON(planBytes)
+	require.Nil(t, err, "convertTerraformBinToJSON failed")
 	assert.Equal(t, convertTFExpectedJson, asJson, "bad json")
 }
 
@@ -55,8 +55,8 @@ func TestDiffBetweenTFStates(t *testing.T) {
 	newStr := `
 	hey
 	joe`
-	addedExpected := []string{ "\tjoe" }
-	removedExpected := []string { "\tmilan" }
+	addedExpected := []string{"\tjoe"}
+	removedExpected := []string{"\tmilan"}
 	addedGot, removedGot := diffBetweenTFStates(oldStr, newStr)
 	assert.Equal(t, addedExpected, addedGot, "added")
 	assert.Equal(t, removedExpected, removedGot, "removed")
@@ -67,12 +67,12 @@ func TestDiffBetweenTFStates(t *testing.T) {
 // library. Its unlikely that in the future more functionality
 // is going to be shared.
 func TestExtractNameFromPath(t *testing.T) {
-	cases := map[string]string {
+	cases := map[string]string{
 		"/path/to/my/file": "file",
-		"myfile": "myfile",
+		"myfile":           "myfile",
 	}
 	for input, expected := range cases {
-		assert.Equal(t, expected, extractNameFromPath(input), "for input: " + input)
+		assert.Equal(t, expected, extractNameFromPath(input), "for input: "+input)
 	}
 }
 
@@ -82,12 +82,12 @@ func TestParseComplianceOutput(t *testing.T) {
 
 	expected := complianceOutput{
 		featurePassed: map[string]bool{
-			"credentials": true,
+			"credentials":  true,
 			"data.example": true,
-			"other": false,
+			"other":        false,
 		},
 		failMessages: map[string][]string{
-			"credentials": {},
+			"credentials":  {},
 			"data.example": {},
 			"other": {
 				"aws_instance.example (aws_instance) does not have tags property.",

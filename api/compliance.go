@@ -165,7 +165,7 @@ func runComplianceTool(fileContent []byte, features []*ComplianceFeature) (strin
 	// tf bin format (like plan.out). Try to convert it to json.
 	// This fails when trying to convert a .tfstate, since tfstates starts with { too.
 	if fileContent[0] != '{' {
-		asJson, err := convertTerraformBinToJson(fileContent)
+		asJson, err := convertTerraformBinToJSON(fileContent)
 		if err != nil {
 			return "", "", fmt.Errorf("cntent given can't be converted to json: %v", err)
 		}

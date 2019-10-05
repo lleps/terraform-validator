@@ -18,10 +18,10 @@ const (
 	failedMsg = "[31mFAILED[0m"
 )
 
-// convertTerraformBinToJson converts a TF file state (like plan.out) to a
+// convertTerraformBinToJSON converts a TF file state (like plan.out) to a
 // pretty json string by invoking internally "terraform show -json".
 // Doesn't supports concurrent access, as uses a hardcoded temporary file.
-func convertTerraformBinToJson(fileBytes []byte) (string, error) {
+func convertTerraformBinToJSON(fileBytes []byte) (string, error) {
 	// write the bytes to a tmp file
 	path := os.TempDir() + "/" + "convertTfToJson.bin.tmp"
 	if err := ioutil.WriteFile(path, fileBytes, os.ModePerm); err != nil {
