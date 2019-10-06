@@ -111,7 +111,7 @@ func parseComplianceOutput(output string) (complianceOutput, error) {
 
 // getFeaturesForTags returns only the features that
 // contains any of the given tags.
-func getFeaturesContainingTags(features []*ComplianceFeature, tags []string) []*ComplianceFeature {
+func getEnabledFeaturesContainingTags(features []*ComplianceFeature, tags []string) []*ComplianceFeature {
 	hasElementInCommon := func(slice1 []string, slice2 []string) bool {
 		for _, s1 := range slice1 {
 			for _, s2 := range slice2 {
@@ -126,7 +126,7 @@ func getFeaturesContainingTags(features []*ComplianceFeature, tags []string) []*
 	result := make([]*ComplianceFeature, 0)
 	if tags != nil {
 		for _, f := range features {
-			if f.Tags == nil {
+			if f.Disabled || f.Tags == nil {
 				continue
 			}
 
@@ -146,7 +146,7 @@ func runComplianceToolForTags(db *database, fileContent []byte, tags []string) (
 		return "", "", fmt.Errorf("can't get features from db: %v", err)
 	}
 
-	features := getFeaturesContainingTags(allFeatures, tags)
+	features := getEnabledFeaturesContainingTags(allFeatures, tags)
 	return runComplianceTool(fileContent, features)
 }
 

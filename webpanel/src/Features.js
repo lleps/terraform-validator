@@ -18,6 +18,8 @@ import IconButton from "@material-ui/core/IconButton";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import {DeleteDialog} from "./DeleteDialog";
 import {TagList, TagListField} from "./TagList";
+import FormControlLabel from "@material-ui/core/FormControlLabel";
+import Switch from "@material-ui/core/Switch";
 
 export function FeatureAddDialog({ onAdd, onCancel }) {
     const [name, setName] = React.useState("");
@@ -98,6 +100,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [tags, setTags] = React.useState([]);
+    const [disabled, setDisabled] = React.useState(false);
 
     React.useEffect(() => {
         axios.get("/features/" + id)
@@ -106,6 +109,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
                 setName(res.data.name);
                 setTags(res.data.tags || []);
                 setLoading(false);
+                setDisabled(res.data.disabled);
             })
             .catch(err => console.log("error getting details: " + err));
     }, []);
@@ -114,7 +118,8 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         setSaving(true);
         axios.put(`/features/` + id, {
             source: source,
-            tags: tags
+            tags: tags,
+            disabled: disabled,
         }).then(() => {
             setSaving(false);
             onSave();
@@ -128,6 +133,17 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         body = <div align={"center"}><CircularProgress/></div>;
     } else {
         body = <div>
+            <FormControlLabel
+                control={
+                    <Switch
+                        checked={disabled}
+                        onChange={e => setDisabled(e.target.checked)}
+                        value="checked"
+                        color="primary"
+                    />
+                }
+                label="Disable this feature"
+            />
             <TagListField tags={tags} onChange={(t) => setTags(t)}/>
             <TextField
                 id="filled-full-width"
@@ -176,7 +192,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
 }
 
 function FeatureEnabledLabel(data) {
-    if (data.enabled === true) {
+    if (data.disabled === false) {
         return <Typography color="primary">enabled</Typography>
     } else {
         return <Typography color="secondary">disabled</Typography>

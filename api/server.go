@@ -148,8 +148,9 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 		},
 		putHandler: func(db *database, obj restObject, body string) error {
 			type BodyFields struct {
-				Source string   `json:"source"`
-				Tags   []string `json:"tags"`
+				Source   string   `json:"source"`
+				Tags     []string `json:"tags"`
+				Disabled bool     `json:"disabled"`
 			}
 			var f BodyFields
 			if err := json.Unmarshal([]byte(body), &f); err != nil {
@@ -159,6 +160,7 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 			feature := obj.(*ComplianceFeature)
 			feature.Source = f.Source
 			feature.Tags = f.Tags
+			feature.Disabled = f.Disabled
 			return db.insertOrUpdateFeature(feature)
 		},
 	})

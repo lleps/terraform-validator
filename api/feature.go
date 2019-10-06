@@ -13,6 +13,7 @@ type ComplianceFeature struct {
 	Name      string   // name of the feature
 	Source    string   // gherkin source code of the feature
 	Tags      []string // to specify which states this feature affects
+	Disabled  bool     // whether this feature is applied or not
 }
 
 func newFeature(name string, source string, tags []string) *ComplianceFeature {
@@ -39,7 +40,7 @@ func (f *ComplianceFeature) writeBasic(dst map[string]interface{}) {
 	dst["name"] = f.Name
 	dst["source"] = f.Source
 	dst["tags"] = f.Tags
-	dst["enabled"] = true
+	dst["disabled"] = f.Disabled
 }
 
 func (f *ComplianceFeature) writeDetailed(dst map[string]interface{}) {
@@ -50,7 +51,7 @@ func (f *ComplianceFeature) writeDetailed(dst map[string]interface{}) {
 
 const complianceFeatureTable = "features"
 
-var complianceFeatureAttributes = []string{"Name", "Source", "Tags"}
+var complianceFeatureAttributes = []string{"Name", "Source", "Tags", "Disabled"}
 
 func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	var result []*ComplianceFeature
