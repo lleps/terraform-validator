@@ -118,13 +118,11 @@ func diffsToPrettyHtml(_ *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.
 
 const validationLogTable = "logs"
 
-var validationLogAttributes = []string{"Kind", "StateJSON", "ComplianceResult", "Account", "Details", "PrevStateJSON", "PrevComplianceResult"}
-
 func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	var result []*ValidationLog
 	err := db.loadGeneric(
 		db.tableFor(validationLogTable),
-		validationLogAttributes,
+		[]string{"Kind", "ComplianceResult", "Account", "Details", "PrevComplianceResult"},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
@@ -143,7 +141,7 @@ func (db *database) findLogById(id string) (*ValidationLog, error) {
 	var result *ValidationLog = nil
 	err := db.loadGeneric(
 		db.tableFor(validationLogTable),
-		validationLogAttributes,
+		[]string{"Kind", "StateJSON", "ComplianceResult", "Account", "Details", "PrevStateJSON", "PrevComplianceResult"},
 		true,
 		expression.Name("Id").Equal(expression.Value(id)),
 		func(i map[string]*dynamodb.AttributeValue) error {

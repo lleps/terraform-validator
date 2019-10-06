@@ -62,16 +62,14 @@ func (state *TFState) writeDetailed(dst map[string]interface{}) {
 
 const tfStateTable = "tfstates"
 
-var tfStateAttributes = []string{
-	"Account", "Bucket", "Path", "State", "ComplianceResult",
-	"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
-}
-
 func (db *database) findTFStateById(id string) (*TFState, error) {
 	var result *TFState = nil
 	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
-		tfStateAttributes,
+		[]string{ // all attributes here
+			"Account", "Bucket", "Path", "State", "ComplianceResult",
+			"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+		},
 		true,
 		expression.Name("Id").Equal(expression.Value(id)),
 		func(i map[string]*dynamodb.AttributeValue) error {
@@ -90,7 +88,10 @@ func (db *database) loadAllTFStates() ([]*TFState, error) {
 	var result []*TFState
 	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
-		tfStateAttributes,
+		[]string{ // all attributes except the state, which is kind of big
+			"Account", "Bucket", "Path", "ComplianceResult",
+			"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+		},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {

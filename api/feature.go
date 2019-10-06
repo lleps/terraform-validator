@@ -51,13 +51,11 @@ func (f *ComplianceFeature) writeDetailed(dst map[string]interface{}) {
 
 const complianceFeatureTable = "features"
 
-var complianceFeatureAttributes = []string{"Name", "Source", "Tags", "Disabled"}
-
 func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	var result []*ComplianceFeature
 	err := db.loadGeneric(
 		db.tableFor(complianceFeatureTable),
-		complianceFeatureAttributes,
+		[]string{"Name", "Tags", "Disabled"},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
@@ -76,7 +74,7 @@ func (db *database) findFeatureById(id string) (*ComplianceFeature, error) {
 	var result *ComplianceFeature = nil
 	err := db.loadGeneric(
 		db.tableFor(complianceFeatureTable),
-		complianceFeatureAttributes,
+		[]string{"Name", "Source", "Tags", "Disabled"},
 		true,
 		expression.Name("Id").Equal(expression.Value(id)),
 		func(i map[string]*dynamodb.AttributeValue) error {
