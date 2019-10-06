@@ -28,7 +28,7 @@ func TestDynamoDB(t *testing.T) {
 	ddb := newDynamoDB(sess, "terraformvalidator_test")
 	require.Nil(t, ddb.initTables(), "1: insertion: ensureTableExists")
 	for _, f := range expected {
-		require.Nil(t, ddb.insertOrUpdateFeature(f), "1: insertion: insertOrUpdateFeature")
+		require.Nil(t, ddb.saveFeature(f), "1: insertion: saveFeature")
 	}
 
 	// 2. Loading
@@ -47,7 +47,7 @@ func TestDynamoDB(t *testing.T) {
 
 	// 5. Updating
 	expected[0] = &ComplianceFeature{"jjj", "999"}
-	require.Nil(t, ddb.insertOrUpdateFeature(expected[0]), "4: removing check")
+	require.Nil(t, ddb.saveFeature(expected[0]), "4: removing check")
 
 	// 6. Updating check
 	got, err = ddb.loadAllFeatures()

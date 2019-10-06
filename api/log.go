@@ -165,7 +165,26 @@ func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	return result, err
 }
 
-func (db *database) insertLog(element *ValidationLog) error {
+func (db *database) findLogById(id string) (*ValidationLog, error) {
+	var result *ValidationLog = nil
+	err := db.loadGeneric(
+		db.tableFor(validationLogTable),
+		validationLogAttributes,
+		true,
+		expression.Name("Id").Equal(expression.Value(id)),
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem ValidationLog
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				result = &elem
+			}
+			return err
+		})
+
+	return result, err
+}
+
+func (db *database) saveLog(element *ValidationLog) error {
 	return db.insertOrUpdateGeneric(db.tableFor(validationLogTable), element)
 }
 

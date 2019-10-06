@@ -118,6 +118,7 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 			}
 			return result, nil
 		},
+		loadOneFunc:   func(db *database, id string) (restObject, error) { return db.findFeatureById(id) },
 		deleteHandler: func(db *database, id string) error { return db.removeFeature(id) },
 		postHandler: func(db *database, body string) (restObject, error) {
 			type BodyFields struct {
@@ -139,7 +140,7 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 			}
 
 			feature := newFeature(f.Name, f.Source, f.Tags)
-			err := db.insertOrUpdateFeature(feature)
+			err := db.saveFeature(feature)
 			if err != nil {
 				return nil, err
 			}
@@ -161,7 +162,7 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 			feature.Source = f.Source
 			feature.Tags = f.Tags
 			feature.Disabled = f.Disabled
-			return db.insertOrUpdateFeature(feature)
+			return db.saveFeature(feature)
 		},
 	})
 }
@@ -180,6 +181,7 @@ func initLogsEndpoint(router *mux.Router, db *database) {
 			}
 			return result, nil
 		},
+		loadOneFunc:   func(db *database, id string) (restObject, error) { return db.findLogById(id) },
 		deleteHandler: func(db *database, id string) error { return db.removeLog(id) },
 	})
 }
@@ -195,7 +197,7 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 			return "", http.StatusNotFound, nil
 		}
 		obj.ForceValidation = true
-		if err := db.insertOrUpdateTFState(obj); err != nil {
+		if err := db.saveTFState(obj); err != nil {
 			return "", 0, fmt.Errorf("can't save in db: %v", err)
 		}
 		return "", http.StatusOK, nil
@@ -215,6 +217,7 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 			}
 			return result, nil
 		},
+		loadOneFunc:   func(db *database, id string) (restObject, error) { return db.findTFStateById(id) },
 		deleteHandler: func(db *database, id string) error { return db.removeTFState(id) },
 		postHandler: func(db *database, body string) (restObject, error) {
 			type BodyFields struct {
@@ -232,7 +235,7 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 			}
 
 			tfstate := newTFState(f.Account, f.Bucket, f.Path, f.Tags)
-			if err := db.insertOrUpdateTFState(tfstate); err != nil {
+			if err := db.saveTFState(tfstate); err != nil {
 				return nil, err
 			}
 
@@ -258,7 +261,7 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 			tfstate.Bucket = f.Bucket
 			tfstate.Path = f.Path
 			tfstate.Tags = f.Tags
-			return db.insertOrUpdateTFState(tfstate)
+			return db.saveTFState(tfstate)
 		},
 	})
 }
@@ -300,7 +303,7 @@ func validateHandler(db *database, body string, _ map[string]string) (string, in
 	}
 
 	logEntry := newValidationLog(complianceInput, complianceOutput)
-	if err := db.insertLog(logEntry); err != nil {
+	if err := db.saveLog(logEntry); err != nil {
 		return "", 0, fmt.Errorf("can't insert logEntry: %v", err)
 	}
 

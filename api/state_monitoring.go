@@ -62,7 +62,7 @@ func checkTFState(
 		// by bad feature input or compliance tool misconfiguration.
 		tfstate.ComplianceResult = "Error: " + stripansi.Strip(err.Error())
 		tfstate.ForceValidation = false
-		if err2 := db.insertOrUpdateTFState(tfstate); err2 != nil {
+		if err2 := db.saveTFState(tfstate); err2 != nil {
 			return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
 		}
 		return
@@ -77,7 +77,7 @@ func checkTFState(
 	// Register log entry
 	now := time.Now().Format(timestampFormat)
 	logEntry = newTFStateLog(stateJSON, complianceOutput, tfstate.State, tfstate.ComplianceResult, tfstate.Account, tfstate.Bucket, tfstate.Path)
-	if err = db.insertLog(logEntry); err != nil {
+	if err = db.saveLog(logEntry); err != nil {
 		err = fmt.Errorf("can't insert logEntry on DB: %v", err)
 		return
 	}
@@ -88,7 +88,7 @@ func checkTFState(
 	tfstate.State = stateJSON
 	tfstate.ComplianceResult = complianceOutput
 	tfstate.S3LastModification = lastModification
-	if err = db.insertOrUpdateTFState(tfstate); err != nil {
+	if err = db.saveTFState(tfstate); err != nil {
 		err = fmt.Errorf("can't update tfstate on DB: %v", err)
 		return
 	}

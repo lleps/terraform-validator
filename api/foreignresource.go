@@ -72,7 +72,7 @@ func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	return result, err
 }
 
-func (db *database) insertForeignResource(element *ForeignResource) error {
+func (db *database) saveForeignResource(element *ForeignResource) error {
 	return db.insertOrUpdateGeneric(db.tableFor(foreignResourcesTable), element)
 }
 

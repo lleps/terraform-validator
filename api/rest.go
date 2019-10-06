@@ -86,6 +86,7 @@ func (a ByRestObject) Less(i, j int) bool {
 // restObjectHandler contains the handlers that effectively perform the operations.
 type restObjectHandler struct {
 	loadAllFunc   func(db *database) ([]restObject, error)
+	loadOneFunc   func(db *database, id string) (restObject, error)
 	deleteHandler func(db *database, id string) error
 	postHandler   func(db *database, body string) (restObject, error)
 	putHandler    func(db *database, obj restObject, body string) error
@@ -96,10 +97,9 @@ type restObjectHandler struct {
 // having to duplicate database logic for every persistent object.
 func registerObjEndpoints(router *mux.Router, endpoint string, db *database, handlers restObjectHandler) {
 
-	// GET /endpoint and GET /endpoint/{id}.
+	// GET /endpoint
 	if handlers.loadAllFunc != nil {
-
-		getAllHandler := func(_ *database, body string, _ map[string]string) (string, int, error) {
+		handler := func(_ *database, body string, _ map[string]string) (string, int, error) {
 			objs, err := handlers.loadAllFunc(db)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
@@ -127,54 +127,53 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			return string(asJSON), http.StatusOK, nil
 		}
 
-		getSpecificHandler := func(_ *database, body string, urlVars map[string]string) (string, int, error) {
+		registerEndpoint(router, db, endpoint, handler, "GET")
+	}
+
+	// GET /endpoint/{id}
+	if handlers.loadOneFunc != nil {
+		handler := func(_ *database, body string, urlVars map[string]string) (string, int, error) {
 			id := urlVars["id"]
-			objs, err := handlers.loadAllFunc(db)
+			obj, err := handlers.loadOneFunc(db, id)
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
-			for _, elem := range objs {
-				if elem.id() == id {
-					dst := make(map[string]interface{})
-					dst["id"] = elem.id()
-					elem.writeDetailed(dst)
-					asJSON, err := json.MarshalIndent(dst, "", "\t")
-					if err != nil {
-						return "", 0, err
-					}
-
-					return string(asJSON), http.StatusOK, nil
-				}
+			if obj == nil {
+				return "can't find obj for id " + id, http.StatusNotFound, nil
 			}
-			return "can't find object: " + id, http.StatusNotFound, nil
+			result := make(map[string]interface{})
+			result["id"] = obj.id()
+			result["timestamp"] = obj.timestamp()
+			obj.writeDetailed(result)
+			asJSON, err := json.MarshalIndent(result, "", "\t")
+			if err != nil {
+				return "", 0, err
+			}
+
+			return string(asJSON), http.StatusOK, nil
 		}
 
-		registerEndpoint(router, db, endpoint, getAllHandler, "GET")
-		registerEndpoint(router, db, endpoint+"/{id}", getSpecificHandler, "GET")
+		registerEndpoint(router, db, endpoint+"/{id}", handler, "GET")
 	}
 
 	// DELETE /endpoint/{id}
 	if handlers.deleteHandler != nil {
-
 		handler := func(_ *database, body string, vars map[string]string) (string, int, error) {
 			id := vars["id"]
-			objs, err := handlers.loadAllFunc(db)
+			obj, err := handlers.loadOneFunc(db, id)
 			if err != nil {
-				return "", 0, fmt.Errorf("DELETE: can't fetch object: %v", err)
+				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
 
-			for _, o := range objs {
-				if o.id() == id {
-					err := handlers.deleteHandler(db, id)
-					if err != nil {
-						return "", 0, fmt.Errorf("DELETE: can't delete object: %v", err)
-					}
-
-					return "", http.StatusOK, nil
-				}
+			if obj == nil {
+				return "can't find obj for id " + id, http.StatusNotFound, nil
 			}
 
-			return "can't find object: " + id, http.StatusNotFound, nil
+			if err := handlers.deleteHandler(db, id); err != nil {
+				return "", 0, fmt.Errorf("DELETE: can't delete object: %v", err)
+			}
+
+			return "", http.StatusOK, nil
 		}
 
 		registerEndpoint(router, db, endpoint+"/{id}", handler, "DELETE")
@@ -182,7 +181,6 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 
 	// POST /endpoint
 	if handlers.postHandler != nil {
-
 		handler := func(_ *database, body string, _ map[string]string) (string, int, error) {
 			obj, err := handlers.postHandler(db, body)
 			if err != nil {
@@ -200,27 +198,24 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 		registerEndpoint(router, db, endpoint, handler, "POST")
 	}
 
-	// PUT /endpoint/{id}.
+	// PUT /endpoint/{id}
 	if handlers.putHandler != nil {
 		handler := func(_ *database, body string, vars map[string]string) (string, int, error) {
 			id := vars["id"]
-			objs, err := handlers.loadAllFunc(db)
+			obj, err := handlers.loadOneFunc(db, id)
 			if err != nil {
-				return "", 0, fmt.Errorf("PUT: can't fetch object: %v", err)
+				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
 
-			for _, o := range objs {
-				if o.id() == id {
-					err := handlers.putHandler(db, o, body)
-					if err != nil {
-						return "", 0, fmt.Errorf("PUT: can't put object: %v", err)
-					}
-
-					return "", http.StatusOK, nil
-				}
+			if obj == nil {
+				return "can't find obj for id " + id, http.StatusNotFound, nil
 			}
 
-			return "", http.StatusNotFound, nil
+			if err := handlers.putHandler(db, obj, body); err != nil {
+				return "", 0, fmt.Errorf("PUT: can't put object: %v", err)
+			}
+
+			return "", http.StatusOK, nil
 		}
 
 		registerEndpoint(router, db, endpoint+"/{id}", handler, "PUT")

@@ -72,7 +72,26 @@ func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	return result, err
 }
 
-func (db *database) insertOrUpdateFeature(feature *ComplianceFeature) error {
+func (db *database) findFeatureById(id string) (*ComplianceFeature, error) {
+	var result *ComplianceFeature = nil
+	err := db.loadGeneric(
+		db.tableFor(complianceFeatureTable),
+		complianceFeatureAttributes,
+		true,
+		expression.Name("Id").Equal(expression.Value(id)),
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem ComplianceFeature
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				result = &elem
+			}
+			return err
+		})
+
+	return result, err
+}
+
+func (db *database) saveFeature(feature *ComplianceFeature) error {
 	return db.insertOrUpdateGeneric(db.tableFor(complianceFeatureTable), feature)
 }
 

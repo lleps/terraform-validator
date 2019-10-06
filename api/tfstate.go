@@ -128,7 +128,7 @@ func (db *database) loadAllTFStates() ([]*TFState, error) {
 	return result, err
 }
 
-func (db *database) insertOrUpdateTFState(element *TFState) error {
+func (db *database) saveTFState(element *TFState) error {
 	return db.insertOrUpdateGeneric(db.tableFor(tfStateTable), element)
 }
 

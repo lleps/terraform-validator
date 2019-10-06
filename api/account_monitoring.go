@@ -64,7 +64,7 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 				if existingFr == nil {
 					if resourceBucket == nil {
 						fr := newForeignResource("ec2-instance", r.ID(), "type: ec2-micro\nami: abcde-123456")
-						if err := db.insertForeignResource(fr); err != nil {
+						if err := db.saveForeignResource(fr); err != nil {
 							log.Printf("Can't insert fr: %v", err)
 							continue
 						}
