@@ -176,6 +176,9 @@ func runComplianceTool(fileContent []byte, features []*ComplianceFeature) (strin
 
 	// Everything written to this directory
 	baseDirectory := os.TempDir() + "/" + strconv.FormatUint(rand.Uint64(), 16)
+	if err := os.Mkdir(baseDirectory, os.ModePerm); err != nil {
+		return "", "", fmt.Errorf("can't make tmp dir: %v", err)
+	}
 	defer os.RemoveAll(baseDirectory)
 	inputJSONPath := baseDirectory + "/compliance_input.json"
 	featuresPath := baseDirectory + "/features"

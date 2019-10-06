@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"strings"
 )
 
 // TFState defines a remote TF state that must be checked
@@ -50,16 +51,24 @@ func (state *TFState) writeBasic(dst map[string]interface{}) {
 	dst["last_update"] = state.LastUpdate
 	dst["force_validation"] = state.ForceValidation
 	dst["tags"] = state.Tags
+
+	// compliance results
 	if state.ComplianceResult == "" {
 		dst["compliance_present"] = false
 		return
 	}
 	dst["compliance_present"] = true
-	parsed, _ := parseComplianceOutput(state.ComplianceResult)
-	dst["compliance_errors"] = parsed.ErrorCount()
-	dst["compliance_tests"] = parsed.TestCount()
-	dst["compliance_features"] = parsed.featurePassed
-	dst["compliance_fail_messages"] = parsed.failMessages
+
+	// If the compliance had a server error is reported too.
+	if strings.HasPrefix(state.ComplianceResult, "Error:") {
+		dst["compliance_error"] = state.ComplianceResult
+	} else { // That's sane compliance, so here can parse.
+		parsed, _ := parseComplianceOutput(state.ComplianceResult)
+		dst["compliance_errors"] = parsed.ErrorCount()
+		dst["compliance_tests"] = parsed.TestCount()
+		dst["compliance_features"] = parsed.featurePassed
+		dst["compliance_fail_messages"] = parsed.failMessages
+	}
 }
 
 func (state *TFState) writeDetailed(dst map[string]interface{}) {

@@ -9,7 +9,7 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import axios from 'axios';
-import {Delete, Edit, Info} from "@material-ui/icons";
+import {Delete, Edit, Error, Info, Sync} from "@material-ui/icons";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import Dialog from "@material-ui/core/Dialog";
@@ -20,6 +20,7 @@ import DialogActions from "@material-ui/core/DialogActions";
 import {DeleteDialog} from "./DeleteDialog";
 import {Account, TagList, TagListField} from "./TagList";
 import {SelectAccount} from "./Account";
+import LinearProgress from "@material-ui/core/LinearProgress";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
@@ -146,6 +147,33 @@ function LastUpdateLabel(data) {
     return <span>{data.last_update}</span>;
 }
 
+function TableEntryCompliance(data) {
+    // states currently in validation
+    if (data.force_validation === true) {
+        return <LinearProgress color="primary"/>
+    }
+
+    // state never validated
+    if (data.compliance_present !== true) {
+        return <Typography>-</Typography>
+    }
+
+    // some error in compliance
+    if (data.compliance_error !== "") {
+        return <Tooltip
+            title={
+                <React.Fragment>
+                    {data.compliance_error}
+                </React.Fragment>
+            }>
+            <Error color={"error"}/>
+        </Tooltip>
+    }
+
+    // full pair state and tooltip
+    return <span>{TableEntryComplianceLabel(data)}{TableEntryComplianceTooltip(data)}</span>
+}
+
 function TableEntryComplianceLabel(data) {
     if (data.compliance_present === true) {
         if (data.compliance_errors === 0) {
@@ -227,10 +255,12 @@ export class TFStatesTable extends React.Component {
         deleting: null,
         updating: false,
         account: "All",
+        updatingIds: new Set(),
     };
 
     fetchData() {
         this.setState({ updating: true });
+
         axios.get(`/tfstates`)
             .then(res => {
                 const tfstates = res.data;
@@ -239,8 +269,52 @@ export class TFStatesTable extends React.Component {
             })
     }
 
+    onSync(id) {
+        axios.post(`/tfstates/` + id + `/validate`).then(() => this.fetchData());
+    }
+
+    syncTimer() {
+        console.log("sync timer!");
+
+        // For every entity that's syncing, refetch from db
+        this.state.tfstates.forEach(tfstate => {
+            if (tfstate.force_validation === true) {
+                let id = tfstate.id;
+                if (!this.state.updatingIds.has(id)) {
+                    console.log("dis bitch " + id + " didn't has updates going so gota gett...");
+
+                    this.setState({ updatingIds: new Set(this.state.updatingIds).add(id) });
+
+                    axios.get(`/tfstates/` + id)
+                        .then(res => {
+                            let newData = res.data;
+                            let newTFStates = this.state.tfstates.map(tfs => tfs.id === id ? newData : tfs);
+                            let newUpdatingIds = new Set(this.state.updatingIds);
+                            newUpdatingIds.delete(id);
+                            this.setState({
+                                tfstates: newTFStates,
+                                updatingIds: newUpdatingIds
+                            });
+                        }).catch(() => {
+                            let newUpdatingIds = new Set(this.state.updatingIds);
+                            newUpdatingIds.delete(id);
+                            this.setState({
+                                updatingIds: newUpdatingIds
+                            });
+                        });
+                }
+            }
+        })
+    }
+
     componentDidMount() {
-        this.fetchData()
+        this.fetchData();
+        let interval = setInterval(() => this.syncTimer(), 1000);
+        this.setState({ syncInterval: interval });
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.state.syncInterval);
     }
 
     render() {
@@ -288,8 +362,16 @@ export class TFStatesTable extends React.Component {
                                         <TagList tags={l.tags}/>
                                     </TableCell>
                                     <TableCell>{LastUpdateLabel(l)}</TableCell>
-                                    <TableCell>{TableEntryComplianceLabel(l)} {TableEntryComplianceTooltip(l)}</TableCell>
+                                    <TableCell>{TableEntryCompliance(l)}</TableCell>
                                     <TableCell align="right">
+                                        { !l.force_validation ?
+                                            <IconButton
+                                                onClick={() => this.onSync(l.id)}>
+                                                <Sync/>
+                                            </IconButton>
+                                            : ""
+                                        }
+
                                         <IconButton onClick={() => this.props.onEdit(l.id)}>
                                             <Edit/>
                                         </IconButton>

@@ -57,12 +57,14 @@ func checkTFState(
 	tfstate *TFState,
 ) (changed bool, logEntry *ValidationLog, err error) {
 	changed, lastModification, stateJSON, complianceOutput, err := performTFStateCheckIfNecessary(sess, db, tfstate)
+	log.Println("Check for log #", tfstate.Id)
+	log.Println("Changed:", changed, "LastModification:", lastModification, "\nstateJSON:", stateJSON, "output", complianceOutput)
 	if err != nil {
 		// Errors here should be reported to the user too. Because they're likely produced
 		// by bad feature input or compliance tool misconfiguration.
 		tfstate.ComplianceResult = "Error: " + stripansi.Strip(err.Error())
 		tfstate.ForceValidation = false
-		if err = db.insertOrUpdateTFState(tfstate); err != nil {
+		if err2 := db.insertOrUpdateTFState(tfstate); err2 != nil {
 			return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
 		}
 		return
@@ -117,6 +119,7 @@ func performTFStateCheckIfNecessary(
 	}
 
 	stateJSON, err = convertTerraformBinToJSON(itemBytes)
+	fmt.Println("stateJSON after cnvert: ", stateJSON)
 	if err != nil {
 		err = fmt.Errorf("can't convert to json: %v", err)
 		return
