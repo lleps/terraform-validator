@@ -56,9 +56,7 @@ func checkTFState(
 	db *database,
 	tfstate *TFState,
 ) (changed bool, logEntry *ValidationLog, err error) {
-	changed, lastModification, stateJSON, complianceOutput, err := performTFStateCheckIfNecessary(sess, db, tfstate)
-	log.Println("Check for log #", tfstate.Id)
-	log.Println("Changed:", changed, "LastModification:", lastModification, "\nstateJSON:", stateJSON, "output", complianceOutput)
+	checked, lastModification, stateJSON, complianceOutput, err := checkTFStateIfNecessary(sess, db, tfstate)
 	if err != nil {
 		// Errors here should be reported to the user too. Because they're likely produced
 		// by bad feature input or compliance tool misconfiguration.
@@ -70,11 +68,18 @@ func checkTFState(
 		return
 	}
 
-	// State check went good. Register log entry
+	if !checked { // if this wasn't checked its because the check isn't forced and the bucket didn't change
+		return
+	}
+
+	changed = tfstate.State != stateJSON || tfstate.ComplianceResult != complianceOutput
+
+	// Register log entry
 	now := time.Now().Format(timestampFormat)
 	logEntry = newTFStateLog(stateJSON, complianceOutput, tfstate.State, tfstate.ComplianceResult, tfstate.Account, tfstate.Bucket, tfstate.Path)
-	if err := db.insertLog(logEntry); err != nil {
-		return true, nil, fmt.Errorf("can't insert logEntry on DB: %v", err)
+	if err = db.insertLog(logEntry); err != nil {
+		err = fmt.Errorf("can't insert logEntry on DB: %v", err)
+		return
 	}
 
 	// Update the state with timestamps and result. Unmark the force check flag as well.
@@ -83,20 +88,22 @@ func checkTFState(
 	tfstate.State = stateJSON
 	tfstate.ComplianceResult = complianceOutput
 	tfstate.S3LastModification = lastModification
-	if err := db.insertOrUpdateTFState(tfstate); err != nil {
-		return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
+	if err = db.insertOrUpdateTFState(tfstate); err != nil {
+		err = fmt.Errorf("can't update tfstate on DB: %v", err)
+		return
 	}
+
 	return
 }
 
 // performStateCheck checks if the given state needs to be checked (either
 // because the state has the ForceValidation flag or the bucket data changed).
 // If it does, pulls from S3 and returns the compliance result for it.
-func performTFStateCheckIfNecessary(
+func checkTFStateIfNecessary(
 	sess *session.Session,
 	db *database,
 	state *TFState,
-) (changed bool, lastModification string, stateJSON string, output string, err error) {
+) (checked bool, lastModification string, stateJSON string, output string, err error) {
 
 	bucket := state.Bucket
 	path := state.Path
@@ -108,7 +115,7 @@ func performTFStateCheckIfNecessary(
 	}
 
 	var itemBytes []byte
-	changed, itemBytes, lastModification, err = getItemFromS3IfChanged(sess, bucket, path, prevLastModification)
+	changed, itemBytes, lastModification, err := getItemFromS3IfChanged(sess, bucket, path, prevLastModification)
 	if err != nil {
 		err = fmt.Errorf("can't get tfstate from s3: %v", err)
 		return
@@ -117,9 +124,9 @@ func performTFStateCheckIfNecessary(
 	if !changed {
 		return
 	}
+	checked = true
 
 	stateJSON, err = convertTerraformBinToJSON(itemBytes)
-	fmt.Println("stateJSON after cnvert: ", stateJSON)
 	if err != nil {
 		err = fmt.Errorf("can't convert to json: %v", err)
 		return
@@ -128,6 +135,16 @@ func performTFStateCheckIfNecessary(
 	_, output, err = runComplianceToolForTags(db, []byte(stateJSON), state.Tags)
 	if err != nil {
 		err = fmt.Errorf("can't run compliance tool: %v", err)
+		return
+	}
+
+	parsed, err := parseComplianceOutput(output)
+	if err != nil {
+		err = fmt.Errorf("can't parse compliance output: %v", err)
+		return
+	}
+	if parsed.TestCount() == 0 && parsed.ErrorCount() == 0 && parsed.PassedCount() == 0 {
+		err = fmt.Errorf("empty tests. output: %v", output)
 		return
 	}
 

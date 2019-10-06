@@ -150,6 +150,12 @@ func runComplianceToolForTags(db *database, fileContent []byte, tags []string) (
 	return runComplianceTool(fileContent, features)
 }
 
+// Bueno, tengo que arreglar todo el quilombo que tengo aca en el backend.
+// Primero, que las validaciones no estan funcionando.
+// unas eran porque el bucket no existia. Perfecto, esas estan arregladas.
+// Las otas son que tienen un state nulo. No se fechean de s3?
+// * Can't convert to json
+
 // runComplianceTool runs the tfComplianceBin against the given file content.
 // fileContent may be either a json string, or a terraform binary file format.
 // Returns the input and output of the tool if successful.
@@ -199,7 +205,7 @@ func runComplianceTool(fileContent []byte, features []*ComplianceFeature) (strin
 	if err != nil {
 		_, ok := err.(*exec.ExitError)
 		if !ok { // ignore exit code errors, compliance throws them all the time.
-			return "", "", fmt.Errorf("tool execution error: %v", err)
+			return "", "", fmt.Errorf("bad tool exit code (%v) output: %v", err, toolOutput)
 		}
 	}
 
@@ -225,7 +231,7 @@ func makeAndFillFeaturesDirectory(path string, features []*ComplianceFeature) er
 
 	// Write all feature files here
 	for _, f := range features {
-		filePath := path + "/" + f.Id + ".feature"
+		filePath := path + "/" + f.Name + ".feature"
 		if err := ioutil.WriteFile(filePath, []byte(f.Source), os.ModePerm); err != nil {
 			return err
 		}

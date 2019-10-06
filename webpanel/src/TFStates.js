@@ -153,13 +153,18 @@ function TableEntryCompliance(data) {
         return <LinearProgress color="primary"/>
     }
 
+    // this data is set locally, to display something while the sync post request is in progress.
+    if (data.force_validation_locally === true) {
+        return <CircularProgress/>
+    }
+
     // state never validated
     if (data.compliance_present !== true) {
         return <Typography>-</Typography>
     }
 
     // some error in compliance
-    if (data.compliance_error !== "") {
+    if (data.compliance_error !== undefined) {
         return <Tooltip
             title={
                 <React.Fragment>
@@ -270,19 +275,23 @@ export class TFStatesTable extends React.Component {
     }
 
     onSync(id) {
+        // edit the entry locally and set the flag update_validation_locally.
+        // just to show feedback while the POST below is going
+        let newData = this.state.tfstates.filter(tfs => tfs.id === id)[0];
+        newData.force_validation_locally = true;
+        let newTFStates = this.state.tfstates.map(tfs => tfs.id === id ? newData : tfs);
+        this.setState({ tfstates: newTFStates });
+
+        // do the request
         axios.post(`/tfstates/` + id + `/validate`).then(() => this.fetchData());
     }
 
     syncTimer() {
-        console.log("sync timer!");
-
         // For every entity that's syncing, refetch from db
         this.state.tfstates.forEach(tfstate => {
             if (tfstate.force_validation === true) {
                 let id = tfstate.id;
                 if (!this.state.updatingIds.has(id)) {
-                    console.log("dis bitch " + id + " didn't has updates going so gota gett...");
-
                     this.setState({ updatingIds: new Set(this.state.updatingIds).add(id) });
 
                     axios.get(`/tfstates/` + id)
