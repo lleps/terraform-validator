@@ -100,7 +100,7 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [tags, setTags] = React.useState([]);
-    const [disabled, setDisabled] = React.useState(false);
+    const [disabled, setDisabled] = React.useState(true);
 
     React.useEffect(() => {
         axios.get("/features/" + id)
@@ -133,17 +133,6 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
         body = <div align={"center"}><CircularProgress/></div>;
     } else {
         body = <div>
-            <FormControlLabel
-                control={
-                    <Switch
-                        checked={disabled}
-                        onChange={e => setDisabled(e.target.checked)}
-                        value="checked"
-                        color="primary"
-                    />
-                }
-                label="Disable this feature"
-            />
             <TagListField tags={tags} onChange={(t) => setTags(t)}/>
             <TextField
                 id="filled-full-width"
@@ -174,7 +163,17 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
             maxWidth="md"
             open={true}
             onClose={() => onCancel()} aria-labelledby="form-dialog-title">
-            <DialogTitle>{loading ? "" : "Edit " + name}</DialogTitle>
+            <DialogTitle><FormControlLabel
+                control={
+                    <Switch
+                        checked={!disabled}
+                        onChange={e => setDisabled(!e.target.checked)}
+                        value="checked"
+                        color="primary"
+                    />
+                }
+                label={name}
+            /></DialogTitle>
             <DialogContent>
                 {body}
             </DialogContent>
