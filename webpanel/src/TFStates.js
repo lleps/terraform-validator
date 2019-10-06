@@ -165,14 +165,17 @@ function TableEntryCompliance(data) {
 
     // some error in compliance
     if (data.compliance_error !== undefined) {
-        return <Tooltip
-            title={
-                <React.Fragment>
-                    {data.compliance_error}
-                </React.Fragment>
-            }>
-            <Error color={"error"}/>
-        </Tooltip>
+        return <span>
+            <Typography component={"body1"} color={"error"}>error</Typography>
+            <Tooltip
+                title={
+                    <React.Fragment>
+                        {data.compliance_error.split("\n").map(l => <span>{l}<br/></span>)}
+                    </React.Fragment>
+                }>
+                <Error color={"error"}/>
+            </Tooltip>
+        </span>
     }
 
     // full pair state and tooltip
@@ -274,16 +277,30 @@ export class TFStatesTable extends React.Component {
             })
     }
 
+    mutateTFState(id, mutator) {
+        let listCopy = [...this.state.tfstates];
+        let current = listCopy.filter(tfs => tfs.id === id);
+        if (current.length !== 1) return;
+        let mutated = mutator(current[0]);
+        listCopy = listCopy.map(tfs => tfs.id === id ? mutated : tfs);
+        this.setState({ tfstates: listCopy });
+    }
+
     onSync(id) {
         // edit the entry locally and set the flag update_validation_locally.
         // just to show feedback while the POST below is going
-        let newData = this.state.tfstates.filter(tfs => tfs.id === id)[0];
-        newData.force_validation_locally = true;
-        let newTFStates = this.state.tfstates.map(tfs => tfs.id === id ? newData : tfs);
-        this.setState({ tfstates: newTFStates });
+        this.mutateTFState(id, old => {
+            old.force_validation_locally = true;
+            return old;
+        });
 
         // do the request
-        axios.post(`/tfstates/` + id + `/validate`).then(() => this.fetchData());
+        axios.post(`/tfstates/` + id + `/validate`).then(() => {
+            this.mutateTFState(id, old => {
+                old.force_validation = true;
+                return old;
+            });
+        });
     }
 
     syncTimer() {
@@ -295,21 +312,13 @@ export class TFStatesTable extends React.Component {
                     this.setState({ updatingIds: new Set(this.state.updatingIds).add(id) });
 
                     axios.get(`/tfstates/` + id)
-                        .then(res => {
-                            let newData = res.data;
-                            let newTFStates = this.state.tfstates.map(tfs => tfs.id === id ? newData : tfs);
+                        .then(res => this.mutateTFState(id, () => res.data))
+                        .catch((err) => console.log("error: " + err))
+                        .finally(() => {
+                            // remove from ongoing set
                             let newUpdatingIds = new Set(this.state.updatingIds);
                             newUpdatingIds.delete(id);
-                            this.setState({
-                                tfstates: newTFStates,
-                                updatingIds: newUpdatingIds
-                            });
-                        }).catch(() => {
-                            let newUpdatingIds = new Set(this.state.updatingIds);
-                            newUpdatingIds.delete(id);
-                            this.setState({
-                                updatingIds: newUpdatingIds
-                            });
+                            this.setState({ updatingIds: newUpdatingIds });
                         });
                 }
             }
@@ -373,7 +382,7 @@ export class TFStatesTable extends React.Component {
                                     <TableCell>{LastUpdateLabel(l)}</TableCell>
                                     <TableCell>{TableEntryCompliance(l)}</TableCell>
                                     <TableCell align="right">
-                                        { !l.force_validation ?
+                                        { (!l.force_validation && !l.force_validation_locally) ?
                                             <IconButton
                                                 onClick={() => this.onSync(l.id)}>
                                                 <Sync/>
