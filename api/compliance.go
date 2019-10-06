@@ -11,19 +11,31 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
 )
 
-// complianceOutput contains the information extracted from a compliance output.
-type complianceOutput struct {
-	featurePassed map[string]bool     // for each feature, true if passed or false otherwise.
-	failMessages  map[string][]string // for each failed feature, lists all the error messages.
+// ComplianceResult contains the information extracted from a compliance output.
+type ComplianceResult struct {
+	Initialized      bool                // if this struct was generated parsing something or is uninitialized
+	Error            bool                // if some error occurred during parsing
+	ErrorMessage     string              // if the above is true, the error
+	FeaturesResult   map[string]bool     // for each feature, true if passed or false otherwise.
+	FeaturesFailures map[string][]string // for each failed feature, lists all the error messages.
 }
 
-func (co complianceOutput) ErrorCount() int {
+func (co ComplianceResult) equals(other ComplianceResult) bool {
+	return co.Initialized == other.Initialized &&
+		co.Error == other.Error &&
+		co.ErrorMessage == other.ErrorMessage &&
+		reflect.DeepEqual(co.FeaturesResult, other.FeaturesResult) &&
+		reflect.DeepEqual(co.FeaturesFailures, other.FeaturesFailures)
+}
+
+func (co ComplianceResult) ErrorCount() int {
 	result := 0
-	for _, v := range co.featurePassed {
+	for _, v := range co.FeaturesResult {
 		if !v {
 			result++
 		}
@@ -31,26 +43,26 @@ func (co complianceOutput) ErrorCount() int {
 	return result
 }
 
-func (co complianceOutput) TestCount() int {
-	return len(co.featurePassed)
+func (co ComplianceResult) TestCount() int {
+	return len(co.FeaturesResult)
 }
 
-func (co complianceOutput) PassedCount() int {
+func (co ComplianceResult) PassedCount() int {
 	return co.TestCount() - co.ErrorCount()
 }
 
-func (co complianceOutput) String() string {
+func (co ComplianceResult) String() string {
 	errors := co.ErrorCount()
 	tests := co.TestCount()
 	sb := strings.Builder{}
 	sb.WriteString("Features:\n")
 	failMsgs := make([]string, 0)
-	for name, passed := range co.featurePassed {
+	for name, passed := range co.FeaturesResult {
 		if passed {
 			sb.WriteString(fmt.Sprintf("- %s %s", name, passedMsg))
 		} else {
 			sb.WriteString(fmt.Sprintf("- %s %s", name, failedMsg))
-			for _, msg := range co.failMessages[name] {
+			for _, msg := range co.FeaturesFailures[name] {
 				failMsgs = append(failMsgs, name+": "+msg)
 			}
 		}
@@ -73,40 +85,46 @@ func (co complianceOutput) String() string {
 
 // parseComplianceOutput takes an output of the tool and extracts the useful
 // information (ie which features passed and which failed) in a structured way.
-func parseComplianceOutput(output string) (complianceOutput, error) {
+func parseComplianceOutput(output string) ComplianceResult {
 	currentFeature := "" // current iterating feature
 
-	result := complianceOutput{}
-	result.featurePassed = make(map[string]bool)
-	result.failMessages = make(map[string][]string)
+	result := ComplianceResult{}
+	result.Initialized = true
+	result.FeaturesResult = make(map[string]bool)
+	result.FeaturesFailures = make(map[string][]string)
 
 	lines := strings.Split(output, "\n")
 	for _, l := range lines {
 		if strings.HasPrefix(l, "Feature:") {
 			fields := strings.Split(l, "#")
 			if len(fields) != 2 {
-				return complianceOutput{}, fmt.Errorf("can't parse line: '%s': len of fields must be 2, is %d", l, len(fields))
+				continue
 			}
 
 			currentFeature = strings.TrimSpace(fields[1])
 			currentFeature = extractNameFromPath(currentFeature)
 			currentFeature = strings.TrimSuffix(currentFeature, ".feature")
-			result.featurePassed[currentFeature] = true // true. Later may encounter a failure and set to false
-			result.failMessages[currentFeature] = make([]string, 0)
+			result.FeaturesResult[currentFeature] = true // true. Later may encounter a failure and set to false
+			result.FeaturesFailures[currentFeature] = make([]string, 0)
 		} else {
 			if currentFeature != "" {
 				trimmed := strings.TrimSpace(l)
 				if strings.HasPrefix(trimmed, "Failure:") && len(strings.Split(trimmed, ":")) == 2 {
 					errorMessage := strings.TrimSpace(strings.Split(trimmed, ":")[1])
 
-					result.featurePassed[currentFeature] = false
-					result.failMessages[currentFeature] = append(result.failMessages[currentFeature], errorMessage)
+					result.FeaturesResult[currentFeature] = false
+					result.FeaturesFailures[currentFeature] = append(result.FeaturesFailures[currentFeature], errorMessage)
 				}
 			}
 		}
 	}
 
-	return result, nil
+	if result.PassedCount() == 0 && result.ErrorCount() == 0 {
+		result.Error = true
+		result.ErrorMessage = "No tests passing or failing.\nOutput:\n" + stripansi.Strip(output)
+	}
+
+	return result
 }
 
 // getFeaturesForTags returns only the features that

@@ -80,13 +80,13 @@ func TestParseComplianceOutput(t *testing.T) {
 	got, err := parseComplianceOutput(runComplianceExpectedOut)
 	require.Nil(t, err, "cant parse out")
 
-	expected := complianceOutput{
-		featurePassed: map[string]bool{
+	expected := ComplianceResult{
+		FeaturesResult: map[string]bool{
 			"credentials":  true,
 			"data.example": true,
 			"other":        false,
 		},
-		failMessages: map[string][]string{
+		FeaturesFailures: map[string][]string{
 			"credentials":  {},
 			"data.example": {},
 			"other": {
@@ -98,8 +98,8 @@ func TestParseComplianceOutput(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, expected.featurePassed, got.featurePassed, "bad featurePassed")
-	assert.Equal(t, expected.failMessages, got.failMessages, "bad failMessages")
+	assert.Equal(t, expected.FeaturesResult, got.FeaturesResult, "bad FeaturesResult")
+	assert.Equal(t, expected.FeaturesFailures, got.FeaturesFailures, "bad FeaturesFailures")
 	assert.Equal(t, 1, got.ErrorCount(), "bad ErrorCount")
 	assert.Equal(t, 2, got.PassedCount(), "bad PassedCount")
 	assert.Equal(t, 3, got.TestCount(), "bad TestCount")
