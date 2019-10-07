@@ -1,4 +1,4 @@
-package main
+package resources
 
 import (
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -12,6 +12,10 @@ type EC2Instance struct {
 
 func (instance EC2Instance) ID() string {
 	return *instance.instance.InstanceId
+}
+
+func (instance EC2Instance) Details() string {
+	return instance.instance.String()
 }
 
 func init() {

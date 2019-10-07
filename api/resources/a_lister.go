@@ -1,9 +1,10 @@
-// This file provides an interface for listable resources.
+// This file provides the interface for listable resources.
 // Every listable resource should register itself with the
 // register function in init(), and every instance of the
 // listable resource should provide an ID() method.
+// Starts with a_ to appear first on directory listing.
 
-package main
+package resources
 
 import (
 	"fmt"
@@ -12,6 +13,7 @@ import (
 
 type AWSResource interface {
 	ID() string
+	Details() string
 }
 
 type ResourceLister func(s *session.Session) ([]AWSResource, error)

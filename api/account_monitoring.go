@@ -2,6 +2,7 @@
 package main
 
 import (
+	"api/resources"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"log"
 	"strings"
@@ -30,7 +31,7 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 
 			// This is the slow part.
 			// Should do some kind of parallelism.
-			resources, err := ListAllResources(sess)
+			resources, err := resources.ListAllResources(sess)
 			if err != nil {
 				log.Printf("Can't list aws resources: %v", err)
 				continue
