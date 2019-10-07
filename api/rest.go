@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"reflect"
 	"sort"
 	"time"
 )
@@ -138,9 +139,11 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			if err != nil {
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
-			if obj == nil {
+
+			if reflect.ValueOf(obj).IsNil() {
 				return "can't find obj for id " + id, http.StatusNotFound, nil
 			}
+
 			result := make(map[string]interface{})
 			result["id"] = obj.id()
 			result["timestamp"] = obj.timestamp()
@@ -165,7 +168,7 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
 
-			if obj == nil {
+			if reflect.ValueOf(obj).IsNil() {
 				return "can't find obj for id " + id, http.StatusNotFound, nil
 			}
 
@@ -207,7 +210,7 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 				return "", 0, fmt.Errorf("GET: can't fetch object: %v", err)
 			}
 
-			if obj == nil {
+			if reflect.ValueOf(obj).IsNil() {
 				return "can't find obj for id " + id, http.StatusNotFound, nil
 			}
 
