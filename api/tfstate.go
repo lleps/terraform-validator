@@ -84,6 +84,28 @@ func (db *database) findTFStateById(id string) (*TFState, error) {
 	return result, err
 }
 
+func (db *database) loadTFStatesWithForceValidation() ([]*TFState, error) {
+	var result []*TFState
+	err := db.loadGeneric(
+		db.tableFor(tfStateTable),
+		[]string{ // all attributes except the state, which is kind of big
+			"Account", "Bucket", "Path", "ComplianceResult",
+			"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+		},
+		true,
+		expression.Name("ForceValidation").Equal(expression.Value(true)),
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem TFState
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				result = append(result, &elem)
+			}
+			return err
+		})
+
+	return result, err
+}
+
 func (db *database) loadAllTFStates() ([]*TFState, error) {
 	var result []*TFState
 	err := db.loadGeneric(

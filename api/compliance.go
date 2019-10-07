@@ -28,12 +28,40 @@ type ComplianceResult struct {
 	TestCount        int                 // the total number of tests
 }
 
+func cmpSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func mapOfSlicesEq(a, b map[string][]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for k, v := range a {
+		if w, ok := b[k]; !ok || !cmpSlices(v, w) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (co ComplianceResult) equals(other ComplianceResult) bool {
 	return co.Initialized == other.Initialized &&
 		co.Error == other.Error &&
 		co.ErrorMessage == other.ErrorMessage &&
 		reflect.DeepEqual(co.FeaturesResult, other.FeaturesResult) &&
-		reflect.DeepEqual(co.FeaturesFailures, other.FeaturesFailures)
+		mapOfSlicesEq(co.FeaturesFailures, other.FeaturesFailures)
 }
 
 // parseComplianceOutput takes an output of the tool and extracts the useful

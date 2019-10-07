@@ -11,45 +11,47 @@ import (
 	"time"
 )
 
-var lastPullTime = time.Time{}
+var lastFullPull = time.Time{}
 
 // initStateChangeMonitoring starts a goroutine that periodically checks if
 // tfstates changed, and if they did runs the compliance tool and logs results.
-// TODO: when not pulling, retrieve every 1 sec just those with forceValidation on true.
 func initStateChangeMonitoring(sess *session.Session, db *database, frequency time.Duration) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range ticker.C {
-			objs, err := db.loadAllTFStates()
+
+			// Check if its time to do a full pull, or
+			// just pull forced validation objs.
+			var objs []*TFState
+			var err error
+			if time.Since(lastFullPull) >= frequency {
+				lastFullPull = time.Now()
+				objs, err = db.loadAllTFStates()
+			} else {
+				objs, err = db.loadTFStatesWithForceValidation()
+			}
 			if err != nil {
-				log.Printf("can't get tfstates to check: %v", err)
+				log.Printf("can't pull tfstates: %v", err)
 				continue
 			}
 
-			timeToPull := time.Since(lastPullTime) >= frequency
-			if timeToPull {
-				lastPullTime = time.Now()
-			}
-
 			for _, obj := range objs {
-				if timeToPull || obj.ForceValidation {
-					// Make a full get of the object. loadAll doesn't
-					// return all the fields, just the top level ones.
-					fullObj, err := db.findTFStateById(obj.Id)
-					if err != nil {
-						log.Printf("can't get full obj for tfstate %s: %v", obj.Id, err)
-						continue
-					}
+				// Make a full get of the object. loadAll doesn't
+				// return all the fields, just the top level ones.
+				fullObj, err := db.findTFStateById(obj.Id)
+				if err != nil {
+					log.Printf("can't get full obj for tfstate %s: %v", obj.Id, err)
+					continue
+				}
 
-					changed, logEntry, err := checkTFState(sess, db, fullObj)
-					if err != nil {
-						log.Printf("can't check TFState %s (%s:%s): %v", fullObj.Id, fullObj.Bucket, fullObj.Path, err)
-						continue
-					}
+				changed, logEntry, err := checkTFState(sess, db, fullObj)
+				if err != nil {
+					log.Printf("can't check TFState %s (%s:%s): %v", fullObj.Id, fullObj.Bucket, fullObj.Path, err)
+					continue
+				}
 
-					if changed && logEntry != nil {
-						log.Printf("Bucket %s:%s changed state. Registered in log %s", fullObj.Bucket, fullObj.Path, logEntry.Id)
-					}
+				if changed && logEntry != nil {
+					log.Printf("Bucket %s:%s changed state. Registered in log %s", fullObj.Bucket, fullObj.Path, logEntry.Id)
 				}
 			}
 		}
