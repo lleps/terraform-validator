@@ -15,8 +15,7 @@ var lastPullTime = time.Time{}
 
 // initStateChangeMonitoring starts a goroutine that periodically checks if
 // tfstates changed, and if they did runs the compliance tool and logs results.
-// TODO: some way to retrieve only selected fields from DB to reduce bandwidth
-//  usage with dynamo.
+// TODO: when not pulling, retrieve every 1 sec just those with forceValidation on true.
 func initStateChangeMonitoring(sess *session.Session, db *database, frequency time.Duration) {
 	ticker := time.NewTicker(5 * time.Second)
 	go func() {
@@ -34,14 +33,22 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 
 			for _, obj := range objs {
 				if timeToPull || obj.ForceValidation {
-					changed, logEntry, err := checkTFState(sess, db, obj)
+					// Make a full get of the object. loadAll doesn't
+					// return all the fields, just the top level ones.
+					fullObj, err := db.findTFStateById(obj.Id)
 					if err != nil {
-						log.Printf("can't check TFState %s (%s:%s): %v", obj.Id, obj.Bucket, obj.Path, err)
+						log.Printf("can't get full obj for tfstate %s: %v", obj.Id, err)
+						continue
+					}
+
+					changed, logEntry, err := checkTFState(sess, db, fullObj)
+					if err != nil {
+						log.Printf("can't check TFState %s (%s:%s): %v", fullObj.Id, fullObj.Bucket, fullObj.Path, err)
 						continue
 					}
 
 					if changed && logEntry != nil {
-						log.Printf("Bucket %s:%s changed state. Registered in log %s", obj.Bucket, obj.Path, logEntry.Id)
+						log.Printf("Bucket %s:%s changed state. Registered in log %s", fullObj.Bucket, fullObj.Path, logEntry.Id)
 					}
 				}
 			}

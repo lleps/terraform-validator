@@ -76,12 +76,15 @@ export class LogDetailsDialog extends React.Component {
                                     <TableCell>{f}</TableCell>
                                     <TableCell align="right">
                                         <TableCell>
-                                            <FeaturePassingChange
+                                            <div/>
+
+{/*                                            <FeaturePassingChange
                                                 oldPassing={(this.state.details.compliance_features_prev || {})[f]}
                                                 newPassing={this.state.details.compliance_features[f]}
                                                 oldErrors={(this.state.details.compliance_fail_messages_prev || {})[f]}
                                                 newErrors={this.state.details.compliance_fail_messages[f]}
                                             />
+                                            */}
                                         </TableCell>
                                     </TableCell>
                                 </TableRow>
