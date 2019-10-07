@@ -130,7 +130,7 @@ func (db *database) loadGeneric(
 
 	for _, i := range result.Items {
 		if err := onItemLoaded(i); err != nil {
-			return nil
+			return err
 		}
 	}
 	return nil

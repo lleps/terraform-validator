@@ -12,15 +12,15 @@ import (
 
 // ValidationLog stores a validation event information.
 type ValidationLog struct {
-	Id            string
-	Timestamp     int64
-	Kind          string // "tfstate" or "validation".
-	InputJson     string // the plan file json
-	Output        string // the compliance tool raw output
-	Account       string // For kind tfstate, the account affected.
-	Details       string // For kind tfstate, is bucket:path.
-	PrevInputJson string // for Kind tfstate, the previous json input.
-	PrevOutput    string // For Kind tfstate, the previous compliance output.
+	Id                   string
+	Timestamp            int64
+	Kind                 string           // "tfstate" or "validation"
+	StateJSON            string           // current state json
+	ComplianceResult     ComplianceResult // current compliance result
+	PrevStateJSON        string           // for Kind tfstate, the previous state json.
+	PrevComplianceResult ComplianceResult // For Kind tfstate, the previous compliance result
+	Account              string           // For kind tfstate, the account affected.
+	Details              string           // For kind tfstate, is bucket:path
 }
 
 const (
@@ -28,35 +28,35 @@ const (
 	logKindTFState    = "tfstate"
 )
 
-func newValidationLog(inputJSON string, output string) *ValidationLog {
+func newValidationLog(inputJSON string, complianceResult ComplianceResult) *ValidationLog {
 	return &ValidationLog{
-		Id:        generateId(),
-		Timestamp: generateTimestamp(),
-		Kind:      logKindValidation,
-		InputJson: inputJSON,
-		Output:    output,
+		Id:               generateId(),
+		Timestamp:        generateTimestamp(),
+		Kind:             logKindValidation,
+		StateJSON:        inputJSON,
+		ComplianceResult: complianceResult,
 	}
 }
 
 func newTFStateLog(
-	inputJSON string,
-	output string,
-	prevInputJSON string,
-	prevOutput string,
+	stateJSON string,
+	complianceResult ComplianceResult,
+	prevStateJSON string,
+	prevComplianceResult ComplianceResult,
 	account string,
 	bucket string,
 	path string,
 ) *ValidationLog {
 	return &ValidationLog{
-		Id:            generateId(),
-		Timestamp:     generateTimestamp(),
-		Kind:          logKindTFState,
-		InputJson:     inputJSON,
-		Output:        output,
-		PrevInputJson: prevInputJSON,
-		PrevOutput:    prevOutput,
-		Account:       account,
-		Details:       bucket + ":" + path,
+		Id:                   generateId(),
+		Timestamp:            generateTimestamp(),
+		Kind:                 logKindTFState,
+		StateJSON:            stateJSON,
+		ComplianceResult:     complianceResult,
+		PrevStateJSON:        prevStateJSON,
+		PrevComplianceResult: prevComplianceResult,
+		Account:              account,
+		Details:              bucket + ":" + path,
 	}
 }
 
@@ -72,53 +72,27 @@ func (l *ValidationLog) timestamp() int64 {
 
 func (l *ValidationLog) writeBasic(dst map[string]interface{}) {
 	dst["kind"] = l.Kind
+	dst["compliance_result"] = l.ComplianceResult
+	dst["prev_compliance_result"] = l.PrevComplianceResult
+	dst["account"] = l.Account
 	dst["details"] = l.Details
-	parsed, _ := parseComplianceOutput(l.Output)
-	dst["compliance_errors"] = parsed.ErrorCount()
-	dst["compliance_tests"] = parsed.TestCount()
-	dst["compliance_errors_prev"] = 0
-	dst["compliance_tests_prev"] = 0
-
-	if l.Kind == "tfstate" {
-		dst["account"] = l.Account
-		added, removed := diffBetweenTFStates(l.PrevInputJson, l.InputJson)
-		dst["lines_added"] = len(added)
-		dst["lines_removed"] = len(removed)
-
-		if l.PrevOutput != "" {
-			parsedPrev, _ := parseComplianceOutput(l.PrevOutput)
-			dst["compliance_errors_prev"] = parsedPrev.ErrorCount()
-			dst["compliance_tests_prev"] = parsedPrev.TestCount()
-		}
-	}
 }
 
 func (l *ValidationLog) writeDetailed(dst map[string]interface{}) {
 	l.writeBasic(dst)
 
-	// Write state diff
+	// In detailed, write state diff too (as a html string). Its pretty implementation-dependent.
+	// But the easier way to make this html diff is through this nice lib diffmatchpatch.
+	// May send the two states and calculate the diff in the frontend. A bit more fexible.
 	diff := diffmatchpatch.New()
-	diffs := diff.DiffMain(l.PrevInputJson, l.InputJson, false)
+	diffs := diff.DiffMain(l.PrevStateJSON, l.StateJSON, false)
 	result := diffsToPrettyHtml(diff, diffs)            // as html
 	result = strings.Replace(result, "	", "&emsp;", -1) // Replace regular tabs with html tabs
 	dst["state_diff_html"] = result
-
-	// Write feature details.
-	// Frontend can check for prev output presence using compliance_prev == true.
-	// All other fields ending with _prev are present only if l.PrevOutput != "".
-	parsed, _ := parseComplianceOutput(l.Output) // TODO: err?
-	dst["compliance_features"] = parsed.featurePassed
-	dst["compliance_fail_messages"] = parsed.failMessages
-	dst["compliance_prev"] = l.PrevOutput != ""
-	if dst["compliance_prev"] == true {
-		parsedPrev, _ := parseComplianceOutput(l.PrevOutput) // TODO: err?
-		dst["compliance_features_prev"] = parsedPrev.featurePassed
-		dst["compliance_fail_messages_prev"] = parsedPrev.failMessages
-	}
 }
 
 // diffsToPrettyHtml converts a []Diff into a pretty HTML report.
-func diffsToPrettyHtml(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.Diff) string {
+func diffsToPrettyHtml(_ *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.Diff) string {
 	var buff bytes.Buffer
 	for _, diff := range diffs {
 		text := strings.Replace(html.EscapeString(diff.Text), "\n", "<br>", -1)
@@ -144,13 +118,11 @@ func diffsToPrettyHtml(dmp *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatc
 
 const validationLogTable = "logs"
 
-var validationLogAttributes = []string{"Kind", "InputJson", "Output", "Account", "Details", "PrevInputJson", "PrevOutput"}
-
 func (db *database) loadAllLogs() ([]*ValidationLog, error) {
 	var result []*ValidationLog
 	err := db.loadGeneric(
 		db.tableFor(validationLogTable),
-		validationLogAttributes,
+		[]string{"Kind", "ComplianceResult", "Account", "Details", "PrevComplianceResult"},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
@@ -169,7 +141,7 @@ func (db *database) findLogById(id string) (*ValidationLog, error) {
 	var result *ValidationLog = nil
 	err := db.loadGeneric(
 		db.tableFor(validationLogTable),
-		validationLogAttributes,
+		[]string{"Kind", "StateJSON", "ComplianceResult", "Account", "Details", "PrevStateJSON", "PrevComplianceResult"},
 		true,
 		expression.Name("Id").Equal(expression.Value(id)),
 		func(i map[string]*dynamodb.AttributeValue) error {

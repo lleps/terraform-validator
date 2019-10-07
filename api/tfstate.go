@@ -4,7 +4,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
-	"strings"
 )
 
 // TFState defines a remote TF state that must be checked
@@ -12,14 +11,14 @@ import (
 type TFState struct {
 	Id                 string
 	Timestamp          int64
-	Account            string   // to categorize states
-	Bucket, Path       string   // s3 bucket and item
-	State              string   // the current state (in json)
-	ComplianceResult   string   // the output for the compliance tool
-	LastUpdate         string   // the last compliance check. "never" = not checked yet.
-	S3LastModification string   // the s3 item last modification (to avoid pulling the state when it doesn't change)
-	ForceValidation    bool     // if this state should be forcibly validated (omit change checks and doesn't wait)
-	Tags               []string // to specify by which features this state should be checked
+	Account            string           // to categorize states
+	Bucket, Path       string           // s3 bucket and item
+	State              string           // the current state (in json)
+	ComplianceResult   ComplianceResult // the result for the compliance tool
+	LastUpdate         string           // the last compliance check. "never" = not checked yet.
+	S3LastModification string           // the s3 item last modification (to avoid pulling the state when it doesn't change)
+	ForceValidation    bool             // if this state should be forcibly validated (omit change checks and doesn't wait)
+	Tags               []string         // to specify by which features this state should be checked
 }
 
 func newTFState(account string, bucket string, path string, tags []string) *TFState {
@@ -51,50 +50,26 @@ func (state *TFState) writeBasic(dst map[string]interface{}) {
 	dst["last_update"] = state.LastUpdate
 	dst["force_validation"] = state.ForceValidation
 	dst["tags"] = state.Tags
-
-	// compliance results
-	if state.ComplianceResult == "" {
-		dst["compliance_present"] = false
-		return
-	}
-	dst["compliance_present"] = true
-
-	// If the compliance had a server error is reported too.
-	if strings.HasPrefix(state.ComplianceResult, "Error:") {
-		dst["compliance_error"] = state.ComplianceResult
-	} else { // That's sane compliance, so here can parse.
-		parsed, _ := parseComplianceOutput(state.ComplianceResult)
-		dst["compliance_errors"] = parsed.ErrorCount()
-		dst["compliance_tests"] = parsed.TestCount()
-		dst["compliance_features"] = parsed.featurePassed
-		dst["compliance_fail_messages"] = parsed.failMessages
-	}
+	dst["compliance_result"] = state.ComplianceResult
 }
 
 func (state *TFState) writeDetailed(dst map[string]interface{}) {
 	state.writeBasic(dst)
 	dst["state"] = state.State
-	if _, exists := dst["compliance_present"]; exists {
-		parsed, _ := parseComplianceOutput(state.ComplianceResult)
-		dst["compliance_features_passed"] = parsed.featurePassed
-		dst["compliance_fail_messages"] = parsed.failMessages
-	}
 }
 
 // database methods
 
 const tfStateTable = "tfstates"
 
-var tfStateAttributes = []string{
-	"Account", "Bucket", "Path", "State", "ComplianceResult",
-	"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
-}
-
 func (db *database) findTFStateById(id string) (*TFState, error) {
 	var result *TFState = nil
 	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
-		tfStateAttributes,
+		[]string{ // all attributes here
+			"Account", "Bucket", "Path", "State", "ComplianceResult",
+			"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+		},
 		true,
 		expression.Name("Id").Equal(expression.Value(id)),
 		func(i map[string]*dynamodb.AttributeValue) error {
@@ -109,11 +84,36 @@ func (db *database) findTFStateById(id string) (*TFState, error) {
 	return result, err
 }
 
+func (db *database) loadTFStatesWithForceValidation() ([]*TFState, error) {
+	var result []*TFState
+	err := db.loadGeneric(
+		db.tableFor(tfStateTable),
+		[]string{ // all attributes except the state, which is kind of big
+			"Account", "Bucket", "Path", "ComplianceResult",
+			"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+		},
+		true,
+		expression.Name("ForceValidation").Equal(expression.Value(true)),
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem TFState
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				result = append(result, &elem)
+			}
+			return err
+		})
+
+	return result, err
+}
+
 func (db *database) loadAllTFStates() ([]*TFState, error) {
 	var result []*TFState
 	err := db.loadGeneric(
 		db.tableFor(tfStateTable),
-		tfStateAttributes,
+		[]string{ // all attributes except the state, which is kind of big
+			"Account", "Bucket", "Path", "ComplianceResult",
+			"LastUpdate", "S3LastModification", "ForceValidation", "Tags",
+		},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
