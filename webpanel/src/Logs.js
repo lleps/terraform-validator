@@ -38,6 +38,8 @@ export class LogDetailsDialog extends React.Component {
     render() {
         // Add all features, prev and current, to this list.
         let allFeatures = [];
+        let prevResult = [];
+        let currResult = [];
         if (this.state.details !== null) {
             let featuresNow = this.state.details.compliance_result.FeaturesResult;
             let featuresPrev = this.state.details.prev_compliance_result.FeaturesResult;
@@ -53,6 +55,8 @@ export class LogDetailsDialog extends React.Component {
                     if (allFeatures.indexOf(feature) === -1) allFeatures.push(feature);
                 }
             }
+            prevResult = this.state.details.prev_compliance_result;
+            currResult = this.state.details.compliance_result;
         }
 
         return (
@@ -77,14 +81,12 @@ export class LogDetailsDialog extends React.Component {
                                     <TableCell align="right">
                                         <TableCell>
                                             <div/>
-
-{/*                                            <FeaturePassingChange
-                                                oldPassing={(this.state.details.compliance_features_prev || {})[f]}
-                                                newPassing={this.state.details.compliance_features[f]}
-                                                oldErrors={(this.state.details.compliance_fail_messages_prev || {})[f]}
-                                                newErrors={this.state.details.compliance_fail_messages[f]}
+                                            <FeaturePassingChange
+                                                oldPassing={(prevResult.FeaturesResult || {})[f]}
+                                                newPassing={currResult.FeaturesResult[f]}
+                                                oldErrors={(prevResult.FeaturesFailures || {})[f]}
+                                                newErrors={currResult.FeaturesFailures[f]}
                                             />
-                                            */}
                                         </TableCell>
                                     </TableCell>
                                 </TableRow>
@@ -108,14 +110,6 @@ export class LogDetailsDialog extends React.Component {
     }
 }
 
-function ValidationText(errors, tests) {
-    if (errors === 0) {
-        return <Typography color="primary" component="body1">{tests}/{tests}</Typography>
-    } else {
-        return <Typography color="secondary" component="body1">{tests-errors}/{tests}</Typography>
-    }
-}
-
 function ValidationState(l) {
     return <span>
         <ComplianceResult result={l.prev_compliance_result}/>
@@ -125,18 +119,26 @@ function ValidationState(l) {
 }
 
 function LinesChangedLabel(l) {
-    if (l.compliance_tests_prev === 0) {
-        return <div>new</div>
+    if (l.prev_compliance_result.Initialized === false) {
+        return <div>State added</div>
     }
 
-    return <div>change</div>
+    return <div>State changed</div>
 }
 
-function FeaturePassing({ passing, errors}) {
+function FeaturePassing({ passing, errors }) {
+    let msg = "none";
+    let color = "action";
+    if (passing === true) {
+        msg = "passing";
+        color = "primary";
+    } else if (passing === false) {
+        msg = "failing";
+        color = "error";
+    }
+
     return <span>
-        <Typography color={passing ? "primary" : "secondary"} component="body1">
-            {passing ? "passing" : "failing"}
-        </Typography>
+        <Typography color={color} component="body1">{msg}</Typography>
         { (errors != null && !passing)
             ? <Tooltip title={<ul>{errors.map((err) => <li>{err}</li>)}</ul>}><Info/></Tooltip>
             : ""
@@ -145,10 +147,6 @@ function FeaturePassing({ passing, errors}) {
 }
 
 function FeaturePassingChange({ oldPassing, newPassing, oldErrors, newErrors}) {
-    if (oldPassing === newPassing || oldPassing == null) {
-        return <FeaturePassing passing={newPassing} errors={newErrors}/>
-    }
-
     return (
         <span>
             <FeaturePassing passing={oldPassing} errors={oldErrors}/>
@@ -165,7 +163,7 @@ function LogTableColumns(kind) {
                 <TableCell>Account</TableCell>
                 <TableCell><AccessTime/></TableCell>
                 <TableCell>Bucket:Path</TableCell>
-                <TableCell>Type</TableCell>
+                <TableCell>Event</TableCell>
                 <TableCell>Compliance</TableCell>
             </React.Fragment>
         );
