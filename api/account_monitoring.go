@@ -12,7 +12,7 @@ import (
 // initAccountResourcesMonitoring starts a goroutine that periodically checks if there are
 // resources in the account that don't belong to any registered tfstate, and reports them.
 func initAccountResourcesMonitoring(sess *session.Session, db *database) {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
 		for range ticker.C {
 			// Load all tfstates and current foreign resources.
@@ -31,7 +31,7 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 
 			// This is the slow part.
 			// Should do some kind of parallelism.
-			resources, err := resources.ListAllResources(sess)
+			resourceList, err := resources.ListAllResources(sess)
 			if err != nil {
 				log.Printf("Can't list aws resources: %v", err)
 				continue
@@ -57,7 +57,7 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 
 			// This is the fast part. Just memory accesses.
 
-			for _, r := range resources {
+			for _, r := range resourceList {
 				// For new discovered resources, should check if findResourceInBuckets. If it is,
 				// insert to db and log.
 
