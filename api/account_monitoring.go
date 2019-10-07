@@ -60,16 +60,17 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 			for _, r := range resources {
 				// For new discovered resources, should check if findResourceInBuckets. If it is,
 				// insert to db and log.
-				existingFr := findForeignResourceEntry(r.ID())
-				resourceBucket := findResourceInBuckets(r.ID())
+
+				existingFr := findForeignResourceEntry(r.Resource.ID())
+				resourceBucket := findResourceInBuckets(r.Resource.ID())
 				if existingFr == nil {
 					if resourceBucket == nil {
-						fr := newForeignResource("ec2-instance", r.ID(), "type: ec2-micro\nami: abcde-123456")
+						fr := newForeignResource(r.Type, r.Resource.ID(), r.Resource.Details())
 						if err := db.saveForeignResource(fr); err != nil {
 							log.Printf("Can't insert fr: %v", err)
 							continue
 						}
-						log.Printf("New foreign resource registered: '%s' #%s", r.ID(), fr.Id)
+						log.Printf("New foreign resource registered (type: %s, ID: '%s' entryID: %s)", r.Type, r.Resource.ID(), fr.Id)
 					}
 				} else {
 					// The resource is not new. Gotta check if the resource is still foreign.

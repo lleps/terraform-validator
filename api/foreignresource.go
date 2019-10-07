@@ -39,25 +39,23 @@ func (r *ForeignResource) timestamp() int64 {
 func (r *ForeignResource) writeBasic(dst map[string]interface{}) {
 	dst["resource_id"] = r.ResourceId
 	dst["resource_type"] = r.ResourceType
-	dst["resource_details"] = r.ResourceDetails
 	dst["is_exception"] = r.IsException
 }
 
 func (r *ForeignResource) writeDetailed(dst map[string]interface{}) {
-
+	r.writeBasic(dst)
+	dst["resource_details"] = r.ResourceDetails
 }
 
 // database methods
 
 const foreignResourcesTable = "foreignresources"
 
-var foreignResourcesAttributes = []string{"ResourceType", "ResourceId", "ResourceDetails", "IsException"}
-
 func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 	var result []*ForeignResource
 	err := db.loadGeneric(
 		db.tableFor(foreignResourcesTable),
-		foreignResourcesAttributes,
+		[]string{"ResourceType", "ResourceId", "IsException"},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
@@ -65,6 +63,25 @@ func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
 			err := dynamodbattribute.UnmarshalMap(i, &elem)
 			if err == nil {
 				result = append(result, &elem)
+			}
+			return err
+		})
+
+	return result, err
+}
+
+func (db *database) findForeignResourceById(id string) (*ForeignResource, error) {
+	var result *ForeignResource = nil
+	err := db.loadGeneric(
+		db.tableFor(foreignResourcesTable),
+		[]string{"ResourceType", "ResourceId", "ResourceDetails", "IsException"},
+		true,
+		expression.Name("Id").Equal(expression.Value(id)),
+		func(i map[string]*dynamodb.AttributeValue) error {
+			var elem ForeignResource
+			err := dynamodbattribute.UnmarshalMap(i, &elem)
+			if err == nil {
+				result = &elem
 			}
 			return err
 		})

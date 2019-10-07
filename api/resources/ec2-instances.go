@@ -22,7 +22,7 @@ func init() {
 	register("EC2Instance", ListEC2Instances)
 }
 
-func ListEC2Instances(sess *session.Session) ([]AWSResource, error) {
+func ListEC2Instances(sess *session.Session) ([]Resource, error) {
 	svc := ec2.New(sess)
 
 	params := &ec2.DescribeInstancesInput{}
@@ -31,7 +31,7 @@ func ListEC2Instances(sess *session.Session) ([]AWSResource, error) {
 		return nil, err
 	}
 
-	resources := make([]AWSResource, 0)
+	resources := make([]Resource, 0)
 	for _, reservation := range resp.Reservations {
 		for _, instance := range reservation.Instances {
 			resources = append(resources, &EC2Instance{

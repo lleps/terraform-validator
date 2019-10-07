@@ -280,6 +280,7 @@ func initForeignResourcesEndpoint(router *mux.Router, db *database) {
 			}
 			return result, nil
 		},
+		loadOneFunc: func(db *database, id string) (restObject, error) { return db.findForeignResourceById(id) },
 	})
 }
 

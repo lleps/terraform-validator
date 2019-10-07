@@ -7,7 +7,7 @@ import Paper from "@material-ui/core/Paper";
 import {LogDetailsDialog, LogsTable} from "./Logs";
 import {FeatureAddDialog, FeatureEditDialog, FeaturesTable} from "./Features";
 import {TFStateDialog, TFStatesTable} from "./TFStates";
-import {ForeignResourcesTable} from "./ForeignResources";
+import {ForeignResourceDetailsDialog, ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
 import FloatingActionButtons from "./Fab";
 
@@ -136,13 +136,28 @@ function TFStates(props) {
     );
 }
 
-function ForeignResources() {
+function ForeignResourceDetails(props) {
+    let id = props.match.params.id;
+    return (
+        <ForeignResourceDetailsDialog
+            id={id}
+            onClose={() => {
+                props.history.push(`/foreignresources`)
+            }}
+        />
+    );
+}
+
+function ForeignResources(props) {
     const classes = useStyles();
 
     return (
         <Grid item xs={12}>
+            <Route path={`${props.match.url}/details/:id`} component={ForeignResourceDetails} />
             <Paper className={classes.paper}>
-                <ForeignResourcesTable/>
+                <ForeignResourcesTable
+                    onSelect={id => props.history.push(`/foreignresources/details/` + id)}
+                />
             </Paper>
         </Grid>
     );

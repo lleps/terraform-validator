@@ -11,12 +11,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
-type AWSResource interface {
+type Resource interface {
 	ID() string
 	Details() string
 }
 
-type ResourceLister func(s *session.Session) ([]AWSResource, error)
+type ResourceLister func(s *session.Session) ([]Resource, error)
 
 var resourceListers = make(map[string]ResourceLister)
 
@@ -29,15 +29,20 @@ func register(name string, lister ResourceLister) {
 	resourceListers[name] = lister
 }
 
-func ListAllResources(s *session.Session) ([]AWSResource, error) {
-	result := make([]AWSResource, 0)
+type ListedResource struct {
+	Type     string
+	Resource Resource
+}
+
+func ListAllResources(s *session.Session) ([]ListedResource, error) {
+	result := make([]ListedResource, 0)
 	for resourceType, lister := range resourceListers {
 		list, err := lister(s)
 		if err != nil {
-			return nil, fmt.Errorf("fetching failed for resource type %s: %v", resourceType, err)
+			return nil, fmt.Errorf("fetch failed for resource type %s: %v", resourceType, err)
 		}
 		for _, e := range list {
-			result = append(result, e)
+			result = append(result, ListedResource{Type: resourceType, Resource: e})
 		}
 	}
 	return result, nil

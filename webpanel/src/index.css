@@ -13,6 +13,7 @@ body {
   font-size: 14px;
   background: #353535;
   color: #ECEFF1;
+  white-space: pre-wrap;
 }
 
 .label {
