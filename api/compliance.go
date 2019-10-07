@@ -23,6 +23,9 @@ type ComplianceResult struct {
 	ErrorMessage     string              // if the above is true, the error
 	FeaturesResult   map[string]bool     // for each feature, true if passed or false otherwise.
 	FeaturesFailures map[string][]string // for each failed feature, lists all the error messages.
+	PassCount        int                 // the number of tests passing
+	FailCount        int                 // the number of tests failing
+	TestCount        int                 // the total number of tests
 }
 
 func (co ComplianceResult) equals(other ComplianceResult) bool {
@@ -31,56 +34,6 @@ func (co ComplianceResult) equals(other ComplianceResult) bool {
 		co.ErrorMessage == other.ErrorMessage &&
 		reflect.DeepEqual(co.FeaturesResult, other.FeaturesResult) &&
 		reflect.DeepEqual(co.FeaturesFailures, other.FeaturesFailures)
-}
-
-func (co ComplianceResult) ErrorCount() int {
-	result := 0
-	for _, v := range co.FeaturesResult {
-		if !v {
-			result++
-		}
-	}
-	return result
-}
-
-func (co ComplianceResult) TestCount() int {
-	return len(co.FeaturesResult)
-}
-
-func (co ComplianceResult) PassedCount() int {
-	return co.TestCount() - co.ErrorCount()
-}
-
-func (co ComplianceResult) String() string {
-	errors := co.ErrorCount()
-	tests := co.TestCount()
-	sb := strings.Builder{}
-	sb.WriteString("Features:\n")
-	failMsgs := make([]string, 0)
-	for name, passed := range co.FeaturesResult {
-		if passed {
-			sb.WriteString(fmt.Sprintf("- %s %s", name, passedMsg))
-		} else {
-			sb.WriteString(fmt.Sprintf("- %s %s", name, failedMsg))
-			for _, msg := range co.FeaturesFailures[name] {
-				failMsgs = append(failMsgs, name+": "+msg)
-			}
-		}
-		sb.WriteString("\n")
-	}
-	sb.WriteString("\n")
-
-	if errors > 0 {
-		sb.WriteString("Errors:\n")
-		for _, msg := range failMsgs {
-			sb.WriteString(fmt.Sprintf("- %s\n", msg))
-		}
-		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("%s\n", failedMsg))
-	} else {
-		sb.WriteString(fmt.Sprintf("%s (%d tests)\n", passedMsg, tests))
-	}
-	return sb.String()
 }
 
 // parseComplianceOutput takes an output of the tool and extracts the useful
@@ -119,9 +72,18 @@ func parseComplianceOutput(output string) ComplianceResult {
 		}
 	}
 
-	if result.PassedCount() == 0 && result.ErrorCount() == 0 {
+	for _, passing := range result.FeaturesResult {
+		if passing {
+			result.PassCount++
+		} else {
+			result.FailCount++
+		}
+		result.TestCount++
+	}
+
+	if result.TestCount == 0 {
 		result.Error = true
-		result.ErrorMessage = "No tests passing or failing.\nOutput:\n" + stripansi.Strip(output)
+		result.ErrorMessage = "No tests parsed.\nOutput:\n" + stripansi.Strip(output)
 	}
 
 	return result

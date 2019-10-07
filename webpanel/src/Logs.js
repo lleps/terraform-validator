@@ -19,6 +19,7 @@ import IconButton from "@material-ui/core/IconButton";
 import {TimeAgo} from "./Time";
 import {Account} from "./TagList";
 import {SelectAccount} from "./Account";
+import {ComplianceResult} from "./Compliance";
 
 export class LogDetailsDialog extends React.Component {
     state = {
@@ -38,8 +39,8 @@ export class LogDetailsDialog extends React.Component {
         // Add all features, prev and current, to this list.
         let allFeatures = [];
         if (this.state.details !== null) {
-            let featuresNow = this.state.details.compliance_features;
-            let featuresPrev = this.state.details.compliance_features_prev;
+            let featuresNow = this.state.details.compliance_result.FeaturesResult;
+            let featuresPrev = this.state.details.prev_compliance_result.FeaturesResult;
 
             if (featuresNow != null) {
                 for (const feature in featuresNow) {
@@ -113,19 +114,11 @@ function ValidationText(errors, tests) {
 }
 
 function ValidationState(l) {
-    let prevErrors = l.compliance_errors_prev;
-    let prevTests = l.compliance_tests_prev;
-    if (prevTests === 0) {
-        return ValidationText(l.compliance_errors, l.compliance_tests);
-    } else {
-        return (
-            <div>
-                {ValidationText(prevErrors, prevTests)}
-                <TrendingFlat/>
-                {ValidationText(l.compliance_errors, l.compliance_tests)}
-            </div>
-        )
-    }
+    return <span>
+        <ComplianceResult result={l.prev_compliance_result}/>
+         <TrendingFlat/>
+        <ComplianceResult result={l.compliance_result}/>
+    </span>
 }
 
 function LinesChangedLabel(l) {

@@ -21,6 +21,7 @@ import {DeleteDialog} from "./DeleteDialog";
 import {Account, TagList, TagListField} from "./TagList";
 import {SelectAccount} from "./Account";
 import LinearProgress from "@material-ui/core/LinearProgress";
+import {ComplianceResult} from "./Compliance";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
@@ -158,103 +159,7 @@ function TableEntryCompliance(data) {
         return <CircularProgress/>
     }
 
-    // state never validated
-    if (data.compliance_present !== true) {
-        return <Typography>-</Typography>
-    }
-
-    // some error in compliance
-    if (data.compliance_error !== undefined) {
-        return <span>
-            <Typography component={"body1"} color={"error"}>error</Typography>
-            <Tooltip
-                title={
-                    <React.Fragment>
-                        {data.compliance_error.split("\n").map(l => <span>{l}<br/></span>)}
-                    </React.Fragment>
-                }>
-                <Error color={"error"}/>
-            </Tooltip>
-        </span>
-    }
-
-    // full pair state and tooltip
-    return <span>{TableEntryComplianceLabel(data)}{TableEntryComplianceTooltip(data)}</span>
-}
-
-function TableEntryComplianceLabel(data) {
-    if (data.compliance_present === true) {
-        if (data.compliance_errors === 0) {
-            return <Typography color="primary" component="body1">{data.compliance_tests}/{data.compliance_tests}</Typography>
-        } else {
-            return <Typography color="secondary" component="body1">{data.compliance_tests-data.compliance_errors}/{data.compliance_tests}</Typography>
-        }
-    } else {
-        return <Typography>-</Typography>
-    }
-}
-
-function TableEntryComplianceDetails(data) {
-    if (data.compliance_present !== true) {
-        return <div/>
-    }
-    let passing = [];
-    let failing = [];
-    let errors = [];
-    for (let f in data.compliance_features) {
-        let result = data.compliance_features[f] === true;
-        if (result) {
-            passing.push(f);
-        } else {
-            failing.push(f);
-        }
-        let errorList = data.compliance_fail_messages[f];
-        if (errorList != null && errorList.length > 0) {
-            errorList.forEach((errName) => {
-                errors.push(f + ": " + errName);
-            });
-        }
-    }
-
-    return (
-        <div>
-            { passing.length > 0 ? "Passing:" : <div/> }
-            <ul>
-                {passing.map((k) =>
-                    <li>{k}</li>
-                )}
-            </ul>
-            { failing.length > 0 ? "Failing:" : <div/> }
-            <ul>
-                {failing.map((k) =>
-                    <li>{k}</li>
-                )}
-            </ul>
-            { errors.length > 0 ? "Errors:" : <div/> }
-            <ul>
-                {errors.map((k) =>
-                    <li>{k}</li>
-                )}
-            </ul>
-        </div>
-    );
-}
-
-function TableEntryComplianceTooltip(data) {
-    if (data.last_update === "") {
-        return <div/>
-    }
-
-    return (
-        <Tooltip
-            title={
-                <React.Fragment>
-                    {TableEntryComplianceDetails(data)}
-                </React.Fragment>
-            }>
-            <Info/>
-        </Tooltip>
-    );
+    return <ComplianceResult result={data.compliance_result}/>
 }
 
 export class TFStatesTable extends React.Component {

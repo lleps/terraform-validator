@@ -55,7 +55,7 @@ func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
 	var result []*ComplianceFeature
 	err := db.loadGeneric(
 		db.tableFor(complianceFeatureTable),
-		[]string{"Name", "Tags", "Disabled"},
+		[]string{"Name", "Source", "Tags", "Disabled"},
 		false,
 		expression.ConditionBuilder{},
 		func(i map[string]*dynamodb.AttributeValue) error {
