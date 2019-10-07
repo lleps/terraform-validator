@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/acarl005/stripansi"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -12,38 +11,47 @@ import (
 	"time"
 )
 
-var lastPullTime = time.Time{}
+var lastFullPull = time.Time{}
 
 // initStateChangeMonitoring starts a goroutine that periodically checks if
 // tfstates changed, and if they did runs the compliance tool and logs results.
-// TODO: some way to retrieve only selected fields from DB to reduce bandwidth
-//  usage with dynamo.
 func initStateChangeMonitoring(sess *session.Session, db *database, frequency time.Duration) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range ticker.C {
-			objs, err := db.loadAllTFStates()
+
+			// Check if its time to do a full pull, or
+			// just pull forced validation objs.
+			var objs []*TFState
+			var err error
+			if time.Since(lastFullPull) >= frequency {
+				lastFullPull = time.Now()
+				objs, err = db.loadAllTFStates()
+			} else {
+				objs, err = db.loadTFStatesWithForceValidation()
+			}
 			if err != nil {
-				log.Printf("can't get tfstates to check: %v", err)
+				log.Printf("can't pull tfstates: %v", err)
 				continue
 			}
 
-			timeToPull := time.Since(lastPullTime) >= frequency
-			if timeToPull {
-				lastPullTime = time.Now()
-			}
-
 			for _, obj := range objs {
-				if timeToPull || obj.ForceValidation {
-					changed, logEntry, err := checkTFState(sess, db, obj)
-					if err != nil {
-						log.Printf("can't check TFState %s (%s:%s): %v", obj.Id, obj.Bucket, obj.Path, err)
-						continue
-					}
+				// Make a full get of the object. loadAll doesn't
+				// return all the fields, just the top level ones.
+				fullObj, err := db.findTFStateById(obj.Id)
+				if err != nil {
+					log.Printf("can't get full obj for tfstate %s: %v", obj.Id, err)
+					continue
+				}
 
-					if changed && logEntry != nil {
-						log.Printf("Bucket %s:%s changed state. Registered in log %s", obj.Bucket, obj.Path, logEntry.Id)
-					}
+				changed, logEntry, err := checkTFState(sess, db, fullObj)
+				if err != nil {
+					log.Printf("can't check TFState %s (%s:%s): %v", fullObj.Id, fullObj.Bucket, fullObj.Path, err)
+					continue
+				}
+
+				if changed && logEntry != nil {
+					log.Printf("Bucket %s:%s changed state. Registered in log %s", fullObj.Bucket, fullObj.Path, logEntry.Id)
 				}
 			}
 		}
@@ -56,15 +64,9 @@ func checkTFState(
 	db *database,
 	tfstate *TFState,
 ) (changed bool, logEntry *ValidationLog, err error) {
-	checked, lastModification, stateJSON, complianceOutput, err := checkTFStateIfNecessary(sess, db, tfstate)
+	checked, lastModification, stateJSON, complianceResult, err := checkTFStateIfNecessary(sess, db, tfstate)
 	if err != nil {
-		// Errors here should be reported to the user too. Because they're likely produced
-		// by bad feature input or compliance tool misconfiguration.
-		tfstate.ComplianceResult = "Error: " + stripansi.Strip(err.Error())
-		tfstate.ForceValidation = false
-		if err2 := db.saveTFState(tfstate); err2 != nil {
-			return true, nil, fmt.Errorf("can't update tfstate on DB: %v", err)
-		}
+		err = fmt.Errorf("can't check tfstate: %v", err)
 		return
 	}
 
@@ -72,11 +74,11 @@ func checkTFState(
 		return
 	}
 
-	changed = tfstate.State != stateJSON || tfstate.ComplianceResult != complianceOutput
+	changed = tfstate.State != stateJSON || !tfstate.ComplianceResult.equals(complianceResult)
 
 	// Register log entry
 	now := time.Now().Format(timestampFormat)
-	logEntry = newTFStateLog(stateJSON, complianceOutput, tfstate.State, tfstate.ComplianceResult, tfstate.Account, tfstate.Bucket, tfstate.Path)
+	logEntry = newTFStateLog(stateJSON, complianceResult, tfstate.State, tfstate.ComplianceResult, tfstate.Account, tfstate.Bucket, tfstate.Path)
 	if err = db.saveLog(logEntry); err != nil {
 		err = fmt.Errorf("can't insert logEntry on DB: %v", err)
 		return
@@ -86,7 +88,7 @@ func checkTFState(
 	tfstate.ForceValidation = false
 	tfstate.LastUpdate = now
 	tfstate.State = stateJSON
-	tfstate.ComplianceResult = complianceOutput
+	tfstate.ComplianceResult = complianceResult
 	tfstate.S3LastModification = lastModification
 	if err = db.saveTFState(tfstate); err != nil {
 		err = fmt.Errorf("can't update tfstate on DB: %v", err)
@@ -103,7 +105,7 @@ func checkTFStateIfNecessary(
 	sess *session.Session,
 	db *database,
 	state *TFState,
-) (checked bool, lastModification string, stateJSON string, output string, err error) {
+) (checked bool, lastModification string, stateJSON string, complianceResult ComplianceResult, err error) {
 
 	bucket := state.Bucket
 	path := state.Path
@@ -132,22 +134,13 @@ func checkTFStateIfNecessary(
 		return
 	}
 
-	_, output, err = runComplianceToolForTags(db, []byte(stateJSON), state.Tags)
+	_, output, err := runComplianceToolForTags(db, []byte(stateJSON), state.Tags)
 	if err != nil {
 		err = fmt.Errorf("can't run compliance tool: %v", err)
 		return
 	}
 
-	parsed, err := parseComplianceOutput(output)
-	if err != nil {
-		err = fmt.Errorf("can't parse compliance output: %v", err)
-		return
-	}
-	if parsed.TestCount() == 0 && parsed.ErrorCount() == 0 && parsed.PassedCount() == 0 {
-		err = fmt.Errorf("empty tests. output: %v", output)
-		return
-	}
-
+	complianceResult = parseComplianceOutput(output)
 	return
 }
 

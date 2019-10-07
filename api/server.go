@@ -297,12 +297,13 @@ func validateHandler(db *database, body string, _ map[string]string) (string, in
 		return "", 0, err
 	}
 
-	complianceInput, complianceOutput, err := runComplianceToolForTags(db, planFileBytes, []string{"validation"})
+	stateJSON, complianceOutput, err := runComplianceToolForTags(db, planFileBytes, []string{"validation"})
 	if err != nil {
 		return "", 0, fmt.Errorf("can't run compliance tool: %v", err)
 	}
 
-	logEntry := newValidationLog(complianceInput, complianceOutput)
+	complianceResult := parseComplianceOutput(complianceOutput)
+	logEntry := newValidationLog(stateJSON, complianceResult)
 	if err := db.saveLog(logEntry); err != nil {
 		return "", 0, fmt.Errorf("can't insert logEntry: %v", err)
 	}
