@@ -51,7 +51,7 @@ func (f *ComplianceFeature) writeDetailed(dst map[string]interface{}) {
 
 const complianceFeatureTable = "features"
 
-func (db *database) loadAllFeatures() ([]*ComplianceFeature, error) {
+func (db *database) loadAllFeaturesFull() ([]*ComplianceFeature, error) {
 	var result []*ComplianceFeature
 	err := db.loadGeneric(
 		db.tableFor(complianceFeatureTable),

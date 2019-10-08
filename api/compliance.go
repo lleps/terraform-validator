@@ -149,7 +149,7 @@ func getEnabledFeaturesContainingTags(features []*ComplianceFeature, tags []stri
 // runComplianceToolForTags runs the compliance tool using only
 // the features from db that contains any of the given tags.
 func runComplianceToolForTags(db *database, fileContent []byte, tags []string) (string, string, error) {
-	allFeatures, err := db.loadAllFeatures()
+	allFeatures, err := db.loadAllFeaturesFull()
 	if err != nil {
 		return "", "", fmt.Errorf("can't get features from db: %v", err)
 	}

@@ -19,14 +19,13 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range ticker.C {
-
 			// Check if its time to do a full pull, or
 			// just pull forced validation objs.
 			var objs []*TFState
 			var err error
 			if time.Since(lastFullPull) >= frequency {
 				lastFullPull = time.Now()
-				objs, err = db.loadAllTFStates()
+				objs, err = db.loadAllTFStatesFull()
 			} else {
 				objs, err = db.loadTFStatesWithForceValidation()
 			}
@@ -36,22 +35,14 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 			}
 
 			for _, obj := range objs {
-				// Make a full get of the object. loadAll doesn't
-				// return all the fields, just the top level ones.
-				fullObj, err := db.findTFStateById(obj.Id)
+				changed, logEntry, err := checkTFState(sess, db, obj)
 				if err != nil {
-					log.Printf("can't get full obj for tfstate %s: %v", obj.Id, err)
-					continue
-				}
-
-				changed, logEntry, err := checkTFState(sess, db, fullObj)
-				if err != nil {
-					log.Printf("can't check TFState %s (%s:%s): %v", fullObj.Id, fullObj.Bucket, fullObj.Path, err)
+					log.Printf("can't check TFState %s (%s:%s): %v", obj.Id, obj.Bucket, obj.Path, err)
 					continue
 				}
 
 				if changed && logEntry != nil {
-					log.Printf("Bucket %s:%s changed state. Registered in log %s", fullObj.Bucket, fullObj.Path, logEntry.Id)
+					log.Printf("Bucket %s:%s changed state. Registered in log %s", obj.Bucket, obj.Path, logEntry.Id)
 				}
 			}
 		}

@@ -18,8 +18,8 @@ func initAccountResourcesMonitoring(sess *session.Session, db *database) {
 			// Load all tfstates and current foreign resources.
 			// Quick. tfstates contains maybe a lot of data,
 			// but foreign resources contains only a few fields.
-			tfStates, err1 := db.loadAllTFStates()
-			foreignResources, err2 := db.loadAllForeignResources()
+			tfStates, err1 := db.loadAllTFStatesFull()
+			foreignResources, err2 := db.loadAllForeignResourcesMinimal()
 			if err1 != nil {
 				log.Printf("Can't load tfstates to monitor for resources outside terraform states: %v", err1)
 				continue

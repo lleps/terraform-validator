@@ -32,7 +32,7 @@ func TestDynamoDB(t *testing.T) {
 	}
 
 	// 2. Loading
-	got, err := ddb.loadAllFeatures()
+	got, err := ddb.loadAllFeaturesFull()
 	require.Nil(t, err, "2: loading")
 	assert.Equal(t, expected, got, "2: loading")
 
@@ -41,7 +41,7 @@ func TestDynamoDB(t *testing.T) {
 	expected = expected[1:]
 
 	// 4. Removing check
-	got, err = ddb.loadAllFeatures()
+	got, err = ddb.loadAllFeaturesFull()
 	require.Nil(t, err, "4: removing check")
 	assert.Equal(t, expected, got, "4: removing check")
 
@@ -50,7 +50,7 @@ func TestDynamoDB(t *testing.T) {
 	require.Nil(t, ddb.saveFeature(expected[0]), "4: removing check")
 
 	// 6. Updating check
-	got, err = ddb.loadAllFeatures()
+	got, err = ddb.loadAllFeaturesFull()
 	require.Nil(t, err, "5: updating check")
 	assert.Equal(t, expected, got, "5: updating check")
 }

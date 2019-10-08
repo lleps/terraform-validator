@@ -108,7 +108,7 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 	// '/features' supports all methods.
 	registerObjEndpoints(router, "/features", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
-			objs, err := db.loadAllFeatures()
+			objs, err := db.loadAllFeaturesFull()
 			if err != nil {
 				return nil, nil
 			}
@@ -171,7 +171,7 @@ func initLogsEndpoint(router *mux.Router, db *database) {
 	// '/logs' supports just GET and DELETE, since they're generated automatically.
 	registerObjEndpoints(router, "/logs", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
-			objs, err := db.loadAllLogs()
+			objs, err := db.loadAllLogsMinimal()
 			if err != nil {
 				return nil, nil
 			}
@@ -207,7 +207,7 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 	// '/tfstates' supports all methods.
 	registerObjEndpoints(router, "/tfstates", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
-			objs, err := db.loadAllTFStates()
+			objs, err := db.loadAllTFStatesMinimal()
 			if err != nil {
 				return nil, nil
 			}
@@ -270,7 +270,7 @@ func initForeignResourcesEndpoint(router *mux.Router, db *database) {
 	// /foreignresources supports just GET.
 	registerObjEndpoints(router, "/foreignresources", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
-			objs, err := db.loadAllForeignResources()
+			objs, err := db.loadAllForeignResourcesMinimal()
 			if err != nil {
 				return nil, nil
 			}

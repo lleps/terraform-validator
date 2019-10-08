@@ -118,7 +118,7 @@ func diffsToPrettyHtml(_ *diffmatchpatch.DiffMatchPatch, diffs []diffmatchpatch.
 
 const validationLogTable = "logs"
 
-func (db *database) loadAllLogs() ([]*ValidationLog, error) {
+func (db *database) loadAllLogsMinimal() ([]*ValidationLog, error) {
 	var result []*ValidationLog
 	err := db.loadGeneric(
 		db.tableFor(validationLogTable),

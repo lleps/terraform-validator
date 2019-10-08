@@ -51,7 +51,7 @@ func (r *ForeignResource) writeDetailed(dst map[string]interface{}) {
 
 const foreignResourcesTable = "foreignresources"
 
-func (db *database) loadAllForeignResources() ([]*ForeignResource, error) {
+func (db *database) loadAllForeignResourcesMinimal() ([]*ForeignResource, error) {
 	var result []*ForeignResource
 	err := db.loadGeneric(
 		db.tableFor(foreignResourcesTable),
