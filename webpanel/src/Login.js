@@ -72,9 +72,15 @@ export default function Login({ onLogin }) {
             setLoading(false);
             onLogin(resp.data.token);
         }).catch((err) => {
-            setError("Invalid username or password.");
             setLoading(false);
-            console.log("can't login: " + err);
+            if (err.response && err.response.status === 401) {
+                setError("Invalid username or password.");
+                setUsername("");
+                setPassword("");
+            } else {
+                setError("An unexpected error occurred.");
+                alert("Unexpected error: " + err);
+            }
         })
     }
 
@@ -124,7 +130,7 @@ export default function Login({ onLogin }) {
                     className={classes.submit}
                     onClick={() => { postLogin() }}
                 >
-                    { loading ? "Login..." : "Login" }
+                    { loading ? "..." : "Login" }
                 </Button>
             </div>
         </Container>
