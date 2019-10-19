@@ -9,7 +9,6 @@ import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import {AccessTime, Info, TrendingFlat} from "@material-ui/icons";
-import axios from 'axios';
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import Dialog from "@material-ui/core/Dialog";
@@ -20,6 +19,7 @@ import {TimeAgo} from "./Time";
 import {Account} from "./TagList";
 import {SelectAccount} from "./Account";
 import {ComplianceResult} from "./Compliance";
+import {handledGet} from "./Requests";
 
 export class LogDetailsDialog extends React.Component {
     state = {
@@ -28,11 +28,9 @@ export class LogDetailsDialog extends React.Component {
     };
 
     componentDidMount() {
-        axios.get("/logs/" + this.props.id)
-            .then(res => {
-                const details = res.data;
-                this.setState({ details: details, diffHtml: details.state_diff_html });
-            })
+        handledGet("/logs/" + this.props.id, data => {
+            this.setState({ details: data, diffHtml: data.state_diff_html });
+        });
     }
 
     render() {
@@ -207,12 +205,7 @@ export class LogsTable extends React.Component {
 
     fetchData() {
         this.setState({ updating: true });
-        axios.get(`/logs`)
-            .then(res => {
-                const logs = res.data;
-                this.setState({ logs });
-                this.setState({ updating: false });
-            })
+        handledGet(`/logs`, data => this.setState({ logs: data, updating: false }));
     }
 
     componentDidMount() {

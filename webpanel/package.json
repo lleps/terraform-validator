@@ -13,7 +13,8 @@
     "react-time-ago": "^5.0.7",
     "recharts": "^1.7.1",
     "typeface-roboto": "0.0.75",
-    "javascript-time-ago": "latest"
+    "javascript-time-ago": "latest",
+    "js-cookie": "latest"
   },
   "scripts": {
     "start": "react-scripts start",

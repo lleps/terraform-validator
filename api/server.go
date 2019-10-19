@@ -23,10 +23,22 @@ var (
 	awsRegionFlag          = flag.String("aws-region", "", "AWS region to use for the session")
 	awsAccessKeyIdFlag     = flag.String("aws-access-key-id", "", "credentials aws_access_key_id parameter")
 	awsSecretAccessKeyFlag = flag.String("aws-secret-access-key", "", "credentials aws_secret_access_key")
+	loginUsernameFlag      = flag.String("login-username", "", "username to login with")
+	loginPasswordFlag      = flag.String("login-password", "", "password to login with")
 	timestampFormat        = time.Stamp
 )
 
 func main() {
+	flag.Parse()
+
+	// Always require username and password
+	if *loginUsernameFlag == "" || *loginPasswordFlag == "" {
+		fmt.Println("Either --login-username or --login-password not specified.")
+		return
+	}
+	loginUsername = *loginUsernameFlag
+	loginPassword = *loginPasswordFlag
+
 	// Create session
 	sess := createSession()
 	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
@@ -40,7 +52,8 @@ func main() {
 	// Init REST handlers
 	log.Printf("Listening on '%s'...", *listenFlag)
 	router := mux.NewRouter()
-	registerEndpoint(router, db, "/validate", validateHandler, "POST")
+	registerPublicEndpoint(router, db, "/login", authenticateHandler, "POST")
+	registerAuthenticatedEndpoint(router, db, "/validate", validateHandler, "POST")
 	initFeaturesEndpoint(router, db)
 	initLogsEndpoint(router, db)
 	initTFStatesEndpoint(router, db)
@@ -65,8 +78,6 @@ func (_ LogWriter) Write(bytes []byte) (n int, err error) {
 }
 
 func createSession() *session.Session {
-	flag.Parse()
-
 	if *awsUseSharedConfig {
 		log.Println("Init aws session... (using shared config)")
 		return session.Must(session.NewSessionWithOptions(session.Options{
@@ -106,7 +117,7 @@ func initDB(sess *session.Session, prefix string) *database {
 
 func initFeaturesEndpoint(router *mux.Router, db *database) {
 	// '/features' supports all methods.
-	registerObjEndpoints(router, "/features", db, restObjectHandler{
+	registerAuthenticatedObjEndpoints(router, "/features", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllFeaturesFull()
 			if err != nil {
@@ -169,7 +180,7 @@ func initFeaturesEndpoint(router *mux.Router, db *database) {
 
 func initLogsEndpoint(router *mux.Router, db *database) {
 	// '/logs' supports just GET and DELETE, since they're generated automatically.
-	registerObjEndpoints(router, "/logs", db, restObjectHandler{
+	registerAuthenticatedObjEndpoints(router, "/logs", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllLogsMinimal()
 			if err != nil {
@@ -202,10 +213,10 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 		}
 		return "", http.StatusOK, nil
 	}
-	registerEndpoint(router, db, "/tfstates/{id}/validate", validationHandler, "POST")
+	registerAuthenticatedEndpoint(router, db, "/tfstates/{id}/validate", validationHandler, "POST")
 
 	// '/tfstates' supports all methods.
-	registerObjEndpoints(router, "/tfstates", db, restObjectHandler{
+	registerAuthenticatedObjEndpoints(router, "/tfstates", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllTFStatesMinimal()
 			if err != nil {
@@ -268,7 +279,7 @@ func initTFStatesEndpoint(router *mux.Router, db *database) {
 
 func initForeignResourcesEndpoint(router *mux.Router, db *database) {
 	// /foreignresources supports just GET.
-	registerObjEndpoints(router, "/foreignresources", db, restObjectHandler{
+	registerAuthenticatedObjEndpoints(router, "/foreignresources", db, restObjectHandler{
 		loadAllFunc: func(db *database) ([]restObject, error) {
 			objs, err := db.loadAllForeignResourcesMinimal()
 			if err != nil {

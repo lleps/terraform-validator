@@ -16,17 +16,44 @@ import (
 	"time"
 )
 
-// registerEndpoint registers in the router an HTTP request
-// with a clean handler that does proper error handling.
-func registerEndpoint(
+func registerAuthenticatedEndpoint(
 	router *mux.Router,
 	db *database,
 	endpoint string,
 	handler func(*database, string, map[string]string) (string, int, error),
 	method string,
 ) {
-	router.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+	registerEndpoint(true, router, db, endpoint, handler, method)
+}
+
+func registerPublicEndpoint(
+	router *mux.Router,
+	db *database,
+	endpoint string,
+	handler func(*database, string, map[string]string) (string, int, error),
+	method string,
+) {
+	registerEndpoint(false, router, db, endpoint, handler, method)
+}
+
+// registerEndpoint registers in the router an HTTP handler
+// with a clean handler that does proper error handling and
+// implements authentication if specified.
+func registerEndpoint(
+	requireAuthentication bool,
+	router *mux.Router,
+	db *database,
+	endpoint string,
+	handler func(*database, string, map[string]string) (string, int, error),
+	method string,
+) {
+	handleFunc := func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
+
+		if requireAuthentication && authMiddleware.CheckJWT(w, r) != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
 		vars := mux.Vars(r)
 		bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -49,7 +76,9 @@ func registerEndpoint(
 		if err != nil {
 			log.Println("Can't write response:", err)
 		}
-	}).Methods(method)
+	}
+
+	router.HandleFunc(endpoint, handleFunc).Methods(method)
 }
 
 // restObject defines some generic methods for objects that are accessible through the rest API.
@@ -93,10 +122,10 @@ type restObjectHandler struct {
 	putHandler    func(db *database, obj restObject, body string) error
 }
 
-// registerObjEndpoints registers automatically GET/POST/DELETE/PUT methods
+// registerAuthenticatedObjEndpoints registers automatically GET/POST/DELETE/PUT methods
 // (depending on the handlers passed) for the given endpoint, without
 // having to duplicate database logic for every persistent object.
-func registerObjEndpoints(router *mux.Router, endpoint string, db *database, handlers restObjectHandler) {
+func registerAuthenticatedObjEndpoints(router *mux.Router, endpoint string, db *database, handlers restObjectHandler) {
 
 	// GET /endpoint
 	if handlers.loadAllFunc != nil {
@@ -128,7 +157,7 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			return string(asJSON), http.StatusOK, nil
 		}
 
-		registerEndpoint(router, db, endpoint, handler, "GET")
+		registerAuthenticatedEndpoint(router, db, endpoint, handler, "GET")
 	}
 
 	// GET /endpoint/{id}
@@ -156,7 +185,7 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			return string(asJSON), http.StatusOK, nil
 		}
 
-		registerEndpoint(router, db, endpoint+"/{id}", handler, "GET")
+		registerAuthenticatedEndpoint(router, db, endpoint+"/{id}", handler, "GET")
 	}
 
 	// DELETE /endpoint/{id}
@@ -179,7 +208,7 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			return "", http.StatusOK, nil
 		}
 
-		registerEndpoint(router, db, endpoint+"/{id}", handler, "DELETE")
+		registerAuthenticatedEndpoint(router, db, endpoint+"/{id}", handler, "DELETE")
 	}
 
 	// POST /endpoint
@@ -198,7 +227,7 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			return string(marshalled), http.StatusOK, nil
 		}
 
-		registerEndpoint(router, db, endpoint, handler, "POST")
+		registerAuthenticatedEndpoint(router, db, endpoint, handler, "POST")
 	}
 
 	// PUT /endpoint/{id}
@@ -221,6 +250,6 @@ func registerObjEndpoints(router *mux.Router, endpoint string, db *database, han
 			return "", http.StatusOK, nil
 		}
 
-		registerEndpoint(router, db, endpoint+"/{id}", handler, "PUT")
+		registerAuthenticatedEndpoint(router, db, endpoint+"/{id}", handler, "PUT")
 	}
 }

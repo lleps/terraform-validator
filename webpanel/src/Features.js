@@ -12,7 +12,6 @@ import Dialog from "@material-ui/core/Dialog";
 import DialogContent from "@material-ui/core/DialogContent";
 import TextField from "@material-ui/core/TextField";
 import DialogActions from "@material-ui/core/DialogActions";
-import axios from 'axios';
 import {Delete, Edit} from "@material-ui/icons";
 import IconButton from "@material-ui/core/IconButton";
 import DialogTitle from "@material-ui/core/DialogTitle";
@@ -20,34 +19,29 @@ import {DeleteDialog} from "./DeleteDialog";
 import {TagList, TagListField} from "./TagList";
 import FormControlLabel from "@material-ui/core/FormControlLabel";
 import Switch from "@material-ui/core/Switch";
+import {handledGet, handledPost, handledPut} from "./Requests";
 
 export function FeatureAddDialog({ onAdd, onCancel }) {
     const [name, setName] = React.useState("");
     const [inputError, setInputError] = React.useState("");
 
     function onClickOk() {
-        axios.get(`/features`).then(res => {
-            if (res.data.findIndex(obj => obj.name === name) === -1) {
+        handledGet(`/features`, data => {
+            if (data.findIndex(obj => obj.name === name) === -1) {
                 if (!nameIsValid(name)) {
                     setInputError("Invalid name.");
                     return;
                 }
 
-                axios.post(`/features`, {
+                handledPost(`/features`, {
                     name: name,
-                    source: "\n\n\n\n",
+                    source: "\nSource code goes here...\n",
                     tags: ["default"]
-                }).then((res) => {
-                    onAdd(res.data.id);
-                }).catch(error => {
-                    console.log(error);
-                })
+                }, res => onAdd(res.id));
             } else {
                 setInputError("Feature '" + name + "' already exists.");
             }
-        }).catch(error => {
-            console.log(error);
-        })
+        });
     }
 
     function handleChange(e) {
@@ -103,29 +97,25 @@ export function FeatureEditDialog({ id, onSave, onCancel }) {
     const [disabled, setDisabled] = React.useState(true);
 
     React.useEffect(() => {
-        axios.get("/features/" + id)
-            .then(res => {
-                setSource(res.data.source);
-                setName(res.data.name);
-                setTags(res.data.tags || []);
-                setLoading(false);
-                setDisabled(res.data.disabled);
-            })
-            .catch(err => console.log("error getting details: " + err));
+        handledGet("/features/" + id, res => {
+            setSource(res.source);
+            setName(res.name);
+            setTags(res.tags || []);
+            setLoading(false);
+            setDisabled(res.disabled);
+        });
     }, []);
 
     function save() {
         setSaving(true);
-        axios.put(`/features/` + id, {
+        handledPut(`/features/` + id, {
             source: source,
             tags: tags,
             disabled: disabled,
-        }).then(() => {
+        }, () => {
             setSaving(false);
             onSave();
-        }).catch(error => {
-            console.log(error);
-        })
+        });
     }
 
     let body;
@@ -208,13 +198,9 @@ export class FeaturesTable extends React.Component {
     fetchData() {
         this.setState({ updating: true });
 
-        axios.get(`/features`).then(res => {
-            const features = res.data;
-            this.setState({ features: features, updating: false });
-        }).catch(error => {
-            this.setState({ updating: false });
-            console.log(error);
-        })
+        handledGet(`/features`, data => {
+            this.setState({ features: data, updating: false });
+        });
     }
 
     componentDidMount() {
