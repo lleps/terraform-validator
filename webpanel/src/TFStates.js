@@ -1,4 +1,3 @@
-import Typography from "@material-ui/core/Typography";
 import React from "react";
 import Title from "./Title";
 import Table from "@material-ui/core/Table";
@@ -8,9 +7,7 @@ import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import {Button} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import axios from 'axios';
 import {Delete, Edit, Error, Info, Sync} from "@material-ui/icons";
-import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
@@ -22,6 +19,7 @@ import {Account, TagList, TagListField} from "./TagList";
 import {SelectAccount} from "./Account";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import {ComplianceResult} from "./Compliance";
+import {handledGet, handledPost, handledPut} from "./Requests";
 
 export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     const [loading, setLoading] = React.useState(false);
@@ -34,15 +32,13 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
     React.useEffect(() => {
         if (editMode) {
             setLoading(true);
-            axios.get("/tfstates/" + id)
-                .then(res => {
-                    setAccount(res.data.account);
-                    setPath(res.data.path);
-                    setBucket(res.data.bucket);
-                    setTags(res.data.tags || []);
-                    setLoading(false);
-                })
-                .catch(err => console.log("error getting details: " + err));
+            handledGet("/tfstates/" + id, data => {
+                setAccount(data.account);
+                setPath(data.path);
+                setBucket(data.bucket);
+                setTags(data.tags || []);
+                setLoading(false);
+            });
         }
     }, [editMode, id]);
 
@@ -58,19 +54,15 @@ export function TFStateDialog({ editMode, onAdd, onCancel, id }) {
         }
 
         if (!editMode) { // POST (with tfstate duplication check)
-            axios.get(`/tfstates`).then(res => {
-                if (anyTFStateMatchingBucketPath(res.data)) {
-                    setInputError("The bucket:path combination already exists.");
+            handledGet(`/tfstates`, data => {
+                if (anyTFStateMatchingBucketPath(data)) {
+                    setInputError("That bucket:path combination already exists.");
                 } else {
-                    axios.post(`/tfstates`, body).then(() => {
-                        onAdd()
-                    })
+                    handledPost(`/tfstates`, body, () => onAdd());
                 }
             })
         } else { // just PUT
-            axios.put(`/tfstates/` + id, body).then(() => {
-                onAdd()
-            })
+            handledPut(`/tfstates/` + id, body, () => onAdd());
         }
     }
 
@@ -174,12 +166,9 @@ export class TFStatesTable extends React.Component {
     fetchData() {
         this.setState({ updating: true });
 
-        axios.get(`/tfstates`)
-            .then(res => {
-                const tfstates = res.data;
-                this.setState({ tfstates });
-                this.setState({ updating: false });
-            })
+        handledGet(`/tfstates`, data => {
+            this.setState({ tfstates: data, updating: false });
+        });
     }
 
     mutateTFState(id, mutator) {
@@ -200,7 +189,7 @@ export class TFStatesTable extends React.Component {
         });
 
         // do the request
-        axios.post(`/tfstates/` + id + `/validate`).then(() => {
+        handledPost(`/tfstates/` + id + `/validate`, {}, () => {
             this.mutateTFState(id, old => {
                 old.force_validation = true;
                 return old;
@@ -216,10 +205,9 @@ export class TFStatesTable extends React.Component {
                 if (!this.state.updatingIds.has(id)) {
                     this.setState({ updatingIds: new Set(this.state.updatingIds).add(id) });
 
-                    axios.get(`/tfstates/` + id)
-                        .then(res => this.mutateTFState(id, () => res.data))
-                        .catch((err) => console.log("error: " + err))
-                        .finally(() => {
+                    handledGet(`/tfstates/` + id,
+                        data => this.mutateTFState(id, () => data),
+                        () => {
                             // remove from ongoing set
                             let newUpdatingIds = new Set(this.state.updatingIds);
                             newUpdatingIds.delete(id);

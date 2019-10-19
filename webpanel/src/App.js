@@ -10,6 +10,7 @@ import {TFStateDialog, TFStatesTable} from "./TFStates";
 import {ForeignResourceDetailsDialog, ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
 import FloatingActionButtons from "./Fab";
+import Login, {getSession, setSessionKey} from "./Login";
 
 const useStyles = makeStyles(theme => ({
     paper: {
@@ -173,11 +174,31 @@ function Routes() {
             <Route path="/features" component={Features}/>
             <Route path="/tfstates" component={TFStates}/>
             <Route path="/foreignresources" component={ForeignResources}/>
+            <Route path="/login" render={() => <Redirect to={"/logs"}/>}/>
         </div>
     );
 }
 
 function App() {
+    let sess = getSession();
+    if (sess == null) {
+        return <Router>
+            <Route path="/login" render={() =>
+                <Login
+                    onLogin={key => {
+                        setSessionKey(key);
+                        window.location.reload();
+                    }}
+                />
+            }/>
+            <Redirect to="/login"/>
+        </Router>
+    } else {
+        return <AppLogged/>
+    }
+}
+
+function AppLogged() {
     return (
         <Router>
             <Navigation title={"Terraform Monitor"} content={Routes}/>

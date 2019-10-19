@@ -2,21 +2,18 @@ import * as React from "react";
 import {Button, Dialog} from "@material-ui/core";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import DialogActions from "@material-ui/core/DialogActions";
-import axios from 'axios';
 import CircularProgress from "@material-ui/core/CircularProgress";
+import {handledDelete} from "./Requests";
 
 export function DeleteDialog({ message, deleteUrl, onCancel, onDelete }) {
     const [deleting, setDeleting] = React.useState(false);
 
     function onClickOk() {
         setDeleting(true);
-        axios.delete(deleteUrl).then(() => {
+        handledDelete(deleteUrl, () => {
             onDelete();
             setDeleting(false);
-        }).catch(err => {
-            console.log(err);
-            setDeleting(false);
-        })
+        });
     }
 
     return (

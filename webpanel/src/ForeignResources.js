@@ -6,16 +6,15 @@ import TableRow from "@material-ui/core/TableRow";
 import TableCell from "@material-ui/core/TableCell";
 import TableBody from "@material-ui/core/TableBody";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import axios from 'axios';
 import {TimeAgo} from "./Time";
 import {Info} from "@material-ui/icons";
-import Tooltip from "@material-ui/core/Tooltip";
 import {Button, Typography} from "@material-ui/core";
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import IconButton from "@material-ui/core/IconButton";
+import {handledGet} from "./Requests";
 
 export function ForeignResourceDetailsDialog({ id, onClose }) {
     const [details, setDetails] = React.useState("");
@@ -23,14 +22,11 @@ export function ForeignResourceDetailsDialog({ id, onClose }) {
     const [type, setType] = React.useState("");
 
     React.useEffect(() => {
-        axios.get("/foreignresources/" + id).then(res => {
+        handledGet("/foreignresources/" + id, data => {
             setLoading(false);
-            setType(res.data.resource_type);
-            setDetails(res.data.resource_details);
-        }).catch(err => {
-            console.log(err);
-            setLoading(false)
-        })
+            setType(data.resource_type);
+            setDetails(data.resource_details);
+        });
     }, []);
 
     return <Dialog
@@ -61,11 +57,9 @@ export class ForeignResourcesTable extends React.Component {
     };
 
     componentDidMount() {
-        axios.get(`/foreignresources`)
-            .then(res => {
-                const foreignresources = res.data;
-                this.setState({ foreignresources });
-            })
+        handledGet(`/foreignresources`, data => {
+            this.setState({ foreignresources: data });
+        })
     }
 
     render() {
