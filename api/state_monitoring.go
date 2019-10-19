@@ -57,7 +57,12 @@ func checkTFState(
 ) (changed bool, logEntry *ValidationLog, err error) {
 	checked, lastModification, stateJSON, complianceResult, err := checkTFStateIfNecessary(sess, db, tfstate)
 	if err != nil {
-		err = fmt.Errorf("can't check tfstate: %v", err)
+		log.Printf("Can't check tfstate. Will update error status and move on: %v", err)
+		tfstate.ForceValidation = false
+		tfstate.ComplianceResult.Initialized = true
+		tfstate.ComplianceResult.Error = true
+		tfstate.ComplianceResult.ErrorMessage = "failed: " + err.Error()
+		err = db.saveTFState(tfstate)
 		return
 	}
 

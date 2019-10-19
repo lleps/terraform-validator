@@ -158,12 +158,6 @@ func runComplianceToolForTags(db *database, fileContent []byte, tags []string) (
 	return runComplianceTool(fileContent, features)
 }
 
-// Bueno, tengo que arreglar todo el quilombo que tengo aca en el backend.
-// Primero, que las validaciones no estan funcionando.
-// unas eran porque el bucket no existia. Perfecto, esas estan arregladas.
-// Las otas son que tienen un state nulo. No se fechean de s3?
-// * Can't convert to json
-
 // runComplianceTool runs the tfComplianceBin against the given file content.
 // fileContent may be either a json string, or a terraform binary file format.
 // Returns the input and output of the tool if successful.
@@ -220,7 +214,7 @@ func runComplianceTool(fileContent []byte, features []*ComplianceFeature) (strin
 	return string(complianceToolInput), toolOutput, nil
 }
 
-// syncFeaturesFolderFromDB writes all the feature files that terraform-compliance requires.
+// makeAndFillFeaturesDirectory writes all the feature files that terraform-compliance requires.
 func makeAndFillFeaturesDirectory(path string, features []*ComplianceFeature) error {
 	// Delete the directory if exists
 	if err := os.RemoveAll(path); err != nil {
