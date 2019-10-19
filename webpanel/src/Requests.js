@@ -55,6 +55,7 @@ function handledGeneric(method, endpoint, data, onResponse, onFinish) {
                 window.location.reload();
             } else {
                 console.log("error in get request: " + err);
+                alert("Unexpected error in request: " + method + " " + endpoint + "\nDetails:\n" + err);
             }
         })
         .then(() => {
