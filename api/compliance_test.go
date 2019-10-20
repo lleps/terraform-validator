@@ -37,11 +37,8 @@ const runComplianceExpectedOut = `
 terraform-compliance v1.0.37 initiated
 
 . Converting terraform plan file.
-* Features  : /media/lleps/Compartido/Dev/terraform-compliance/example/example_01/aws
-* Plan File : /media/lleps/Compartido/Dev/terraform-validator/plan.out.json
 
 . Running tests.
-Feature: Credentials should not be within the code  # /media/lleps/Compartido/Dev/terraform-compliance/example/example_01/aws/credentials.feature
     In order to prevent any credentials leakage
     As engineers
     We'll enforce credentials will not be hardcoded
@@ -58,7 +55,6 @@ Feature: Credentials should not be within the code  # /media/lleps/Compartido/De
         SKIPPING: Skipping the step since provider type does not have secret_key property.
         | secret_key | (?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=]) |
 
-Feature: Data example feature  # /media/lleps/Compartido/Dev/terraform-compliance/example/example_01/aws/data.example.feature
 
     Scenario: Subnet Count
         SKIPPING: Can not find aws_availability_zones data defined in target terraform plan.
@@ -67,7 +63,6 @@ Feature: Data example feature  # /media/lleps/Compartido/Dev/terraform-complianc
         And I count them
         Then I expect the result is greater than 2
 
-Feature: Resources should be properly tagged  # /media/lleps/Compartido/Dev/terraform-compliance/example/example_01/aws/other.feature
     In order to keep track of resource ownership
     As engineers
     We'll enforce tagging on all resources
