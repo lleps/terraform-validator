@@ -323,5 +323,5 @@ func validateHandler(db *database, body string, _ map[string]string) (string, in
 
 // validateFeatureName returns true if the given feature name is valid (doesn't contains invalid file characters).
 func validateFeatureName(name string) bool {
-	return !strings.ContainsAny(name, "./* ")
+	return len(name) > 0 && len(name) < 30 && !strings.ContainsAny(name, "./* ")
 }
