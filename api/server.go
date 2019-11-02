@@ -47,7 +47,6 @@ func main() {
 	// Spawn monitoring routines
 	log.Printf("Init state and resource monitoring tickers...")
 	initStateChangeMonitoring(sess, db, time.Second*60)
-	initAccountResourcesMonitoring(sess, db)
 
 	// Init REST handlers
 	log.Printf("Listening on '%s'...", *listenFlag)
@@ -57,7 +56,6 @@ func main() {
 	initFeaturesEndpoint(router, db)
 	initLogsEndpoint(router, db)
 	initTFStatesEndpoint(router, db)
-	initForeignResourcesEndpoint(router, db)
 	http.Handle("/", router)
 
 	// Start REST server (and CORS stuff)

@@ -30,13 +30,6 @@ export const mainListItems = (
             </ListItemIcon>
             <ListItemText primary="States" />
         </ListItem>
-
-        <ListItem component={Link} to={'/foreignresources'} button>
-            <ListItemIcon>
-                <LayersIcon />
-            </ListItemIcon>
-            <ListItemText primary="Foreign Resources" />
-        </ListItem>
     </div>
 );
 

@@ -173,7 +173,6 @@ function Routes() {
             <Route path="/logs" component={Logs}/>
             <Route path="/features" component={Features}/>
             <Route path="/tfstates" component={TFStates}/>
-            <Route path="/foreignresources" component={ForeignResources}/>
             <Route path="/login" render={() => <Redirect to={"/logs"}/>}/>
         </div>
     );
