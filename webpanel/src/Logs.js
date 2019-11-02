@@ -20,6 +20,8 @@ import {Account} from "./TagList";
 import {SelectAccount} from "./Account";
 import {ComplianceResult} from "./Compliance";
 import {handledGet} from "./Requests";
+import TablePagination from "@material-ui/core/TablePagination";
+import TableFooter from "@material-ui/core/TableFooter";
 
 export class LogDetailsDialog extends React.Component {
     state = {
@@ -201,6 +203,8 @@ export class LogsTable extends React.Component {
         logs: [],
         updating: false,
         account: "All",
+        page: 0,
+        rowsPerPage: 5,
     };
 
     fetchData() {
@@ -217,13 +221,28 @@ export class LogsTable extends React.Component {
             <React.Fragment>
                 <div>
                     <Title>Latest {this.props.kind === "tfstate" ? "State Changes" : "Validations"}</Title>
-                    { this.props.kind === "tfstate" ?
-                        <SelectAccount
-                            objs={this.state.logs}
-                            selected={this.state.account}
-                            onSelect={v => this.setState({ account: v })}
-                        />
-                        : ""}
+                    <span>
+                        { this.props.kind === "tfstate" ?
+                            <SelectAccount
+                                objs={this.state.logs}
+                                selected={this.state.account}
+                                onSelect={v => this.setState({ account: v })}
+                            /> : ""}
+                            <TablePagination
+                                align="left"
+                                rowsPerPageOptions={[5, 15,30]}
+                                colSpan={3}
+                                count={this.state.logs
+                                    .filter(l => this.state.account === "All" || this.state.account === l.account)
+                                    .filter(l => l.kind === this.props.kind)
+                                    .length
+                                }
+                                rowsPerPage={this.state.rowsPerPage}
+                                page={this.state.page}
+                                onChangePage={(_, newPage) => this.setState({ page: newPage })}
+                                onChangeRowsPerPage={(e) => this.setState({ rowsPerPage: parseInt(e.target.value, 10) })}
+                            />
+                    </span>
                 </div>
                 <Table size="small">
                     <TableHead>
@@ -236,6 +255,10 @@ export class LogsTable extends React.Component {
                         { this.state.logs
                             .filter(l => this.state.account === "All" || this.state.account === l.account)
                             .filter(l => l.kind === this.props.kind)
+                            .slice(
+                                this.state.page * this.state.rowsPerPage,
+                                this.state.page * this.state.rowsPerPage + this.state.rowsPerPage
+                            )
                             .map(l =>
                                 <TableRow key={l.id}>
                                     {LogTableCells(l)}
@@ -248,6 +271,11 @@ export class LogsTable extends React.Component {
                             )
                         }
                     </TableBody>
+                    <TableFooter>
+                        <TableRow>
+
+                        </TableRow>
+                    </TableFooter>
                 </Table>
                 { this.state.updating ? <div align="center"><CircularProgress/></div> : "" }
             </React.Fragment>
