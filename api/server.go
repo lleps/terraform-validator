@@ -25,6 +25,8 @@ var (
 	awsSecretAccessKeyFlag = flag.String("aws-secret-access-key", "", "credentials aws_secret_access_key")
 	loginUsernameFlag      = flag.String("login-username", "", "username to login with")
 	loginPasswordFlag      = flag.String("login-password", "", "password to login with")
+	slackUrlFlagFlag       = flag.String("slack-url", "", "url to report failed validations")
+	panelUrlFlag           = flag.String("panel-url", "", "panel url, for references.")
 	timestampFormat        = time.Stamp
 )
 
@@ -45,8 +47,12 @@ func main() {
 	db := initDB(sess, *dynamoPrefixFlag)
 
 	// Spawn monitoring routines
-	log.Printf("Init state and resource monitoring tickers...")
+	log.Printf("Init state monitoring ticker...")
 	initStateChangeMonitoring(sess, db, time.Second*60)
+	if *slackUrlFlagFlag != "" {
+		enableSlackPosts(*panelUrlFlag, *slackUrlFlagFlag)
+		log.Println("Errors will be reported to slack. Panel url given: " + *panelUrlFlag)
+	}
 
 	// Init REST handlers
 	log.Printf("Listening on '%s'...", *listenFlag)

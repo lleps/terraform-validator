@@ -2,16 +2,28 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"strings"
 	"time"
 )
 
-var lastFullPull = time.Time{}
+var mLastFullPull = time.Time{}
+var mPanelUrl, mSlackHookUrl = "", ""
+
+// enableSlackPosts will enable slack posts to report failed
+// state validations to a slack channel.
+func enableSlackPosts(panelUrl, slackHookUrl string) {
+	mPanelUrl = panelUrl
+	mSlackHookUrl = slackHookUrl
+}
 
 // initStateChangeMonitoring starts a goroutine that periodically checks if
 // tfstates changed, and if they did runs the compliance tool and logs results.
@@ -23,8 +35,8 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 			// just pull forced validation objs.
 			var objs []*TFState
 			var err error
-			if time.Since(lastFullPull) >= frequency {
-				lastFullPull = time.Now()
+			if time.Since(mLastFullPull) >= frequency {
+				mLastFullPull = time.Now()
 				objs, err = db.loadAllTFStatesFull()
 			} else {
 				objs, err = db.loadTFStatesWithForceValidation()
@@ -41,12 +53,59 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 					continue
 				}
 
+				if mSlackHookUrl != "" && logEntry != nil && logEntry.ComplianceResult.FailCount > 0 {
+					err = reportFailedValidationToSlack(mSlackHookUrl, mPanelUrl, obj)
+					if err != nil {
+						log.Printf("can't send to slack: %v", err)
+					}
+				}
+
 				if changed && logEntry != nil {
 					log.Printf("Bucket %s:%s changed state. Registered in log %s", obj.Bucket, obj.Path, logEntry.Id)
 				}
 			}
 		}
 	}()
+}
+
+func reportFailedValidationToSlack(slackUrl string, panelUrl string, state *TFState) error {
+	var postBody struct {
+		Text string `json:"text"`
+	}
+
+	postBody.Text = fmt.Sprintf(
+		"Automatic state validation failed for state at %s:%s. See details at %s.",
+		state.Bucket, state.Path, panelUrl+"/logs/"+state.Id)
+
+	marshaled, err := json.Marshal(postBody)
+	if err != nil {
+		return fmt.Errorf("can't marshal into json: %v", err)
+	}
+
+	fullBody := "payload=" + string(marshaled)
+	req, err := http.NewRequest("POST", slackUrl, strings.NewReader(fullBody))
+	if err != nil {
+		return fmt.Errorf("can't build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("can't do request: %v", err)
+	}
+
+	defer resp.Body.Close()
+	respContent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("can't read body bytes: %v", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("invalid response code %d: %s", resp.StatusCode, string(respContent))
+	}
+
+	return nil
 }
 
 // checkTFState checks the given tfstate for compliance.

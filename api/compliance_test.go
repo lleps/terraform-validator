@@ -28,9 +28,9 @@ func TestParseComplianceOutput(t *testing.T) {
 	}
 	assert.Equal(t, expected.FeaturesResult, got.FeaturesResult, "bad FeaturesResult")
 	assert.Equal(t, expected.FeaturesFailures, got.FeaturesFailures, "bad FeaturesFailures")
-	assert.Equal(t, 1, got.ErrorCount(), "bad ErrorCount")
-	assert.Equal(t, 2, got.PassedCount(), "bad PassedCount")
-	assert.Equal(t, 3, got.TestCount(), "bad TestCount")
+	assert.Equal(t, 1, got.FailCount, "bad FailCount")
+	assert.Equal(t, 2, got.PassCount, "bad PassCount")
+	assert.Equal(t, 3, got.TestCount, "bad TestCount")
 }
 
 const runComplianceExpectedOut = `

@@ -24,7 +24,7 @@ func TestDynamoDB(t *testing.T) {
 
 	// 1. Insertion
 	sess := session.Must(session.NewSession())
-	expected := []*ComplianceFeature{{"abc", "123"}, {"jjj", "456"}}
+	expected := []*ComplianceFeature{newFeature("abc", "123", nil), newFeature("jjj", "456", nil)}
 	ddb := newDynamoDB(sess, "terraformvalidator_test")
 	require.Nil(t, ddb.initTables(), "1: insertion: ensureTableExists")
 	for _, f := range expected {
@@ -46,7 +46,7 @@ func TestDynamoDB(t *testing.T) {
 	assert.Equal(t, expected, got, "4: removing check")
 
 	// 5. Updating
-	expected[0] = &ComplianceFeature{"jjj", "999"}
+	expected[0] = newFeature("jjj", "999", nil)
 	require.Nil(t, ddb.saveFeature(expected[0]), "4: removing check")
 
 	// 6. Updating check

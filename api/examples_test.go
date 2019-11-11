@@ -1,6 +1,7 @@
 package main
 
 import (
+	"api/resources"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -21,6 +22,22 @@ func ExampleGetItemFromS3IfChanged() {
 	// output comment GoLand doesn't let me run this.
 }
 
+func ExampleSendValidationToSlack() {
+	slackWebHookUrl := "https://hooks.slack.com/services/YOUR_EXAMPLE_SLACK_KEYS_HERE"
+	err := reportFailedValidationToSlack(
+		slackWebHookUrl,
+		"test.com",
+		&TFState{
+			Id:     "my-tfstate-id",
+			Bucket: "test-bucket",
+			Path:   "/some/path",
+		})
+	if err != nil {
+		panic(err)
+	}
+	// Output:
+}
+
 func ExampleListAllResources() {
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String("us-west-2")},
@@ -28,14 +45,14 @@ func ExampleListAllResources() {
 	if err != nil {
 		panic(err)
 	}
-	resources, err := ListAllResources(sess)
+	rs, err := resources.ListAllResources(sess)
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("Resources: ")
-	for _, res := range resources {
-		fmt.Println(res.ID())
+	for _, res := range rs {
+		fmt.Println(res.Resource.ID())
 	}
 	fmt.Println("Ok.")
 	// Output:
