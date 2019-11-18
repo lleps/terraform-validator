@@ -23,8 +23,6 @@ var (
 	awsRegionFlag          = flag.String("aws-region", "", "AWS region to use for the session")
 	awsAccessKeyIdFlag     = flag.String("aws-access-key-id", "", "credentials aws_access_key_id parameter")
 	awsSecretAccessKeyFlag = flag.String("aws-secret-access-key", "", "credentials aws_secret_access_key")
-	loginUsernameFlag      = flag.String("login-username", "", "username to login with")
-	loginPasswordFlag      = flag.String("login-password", "", "password to login with")
 	slackUrlFlagFlag       = flag.String("slack-url", "", "url to report failed validations")
 	panelUrlFlag           = flag.String("panel-url", "", "panel url, for references.")
 	timestampFormat        = time.Stamp
@@ -32,14 +30,6 @@ var (
 
 func main() {
 	flag.Parse()
-
-	// Always require username and password
-	if *loginUsernameFlag == "" || *loginPasswordFlag == "" {
-		fmt.Println("Either --login-username or --login-password not specified.")
-		return
-	}
-	loginUsername = *loginUsernameFlag
-	loginPassword = *loginPasswordFlag
 
 	// Create session
 	sess := createSession()
@@ -57,7 +47,6 @@ func main() {
 	// Init REST handlers
 	log.Printf("Listening on '%s'...", *listenFlag)
 	router := mux.NewRouter()
-	registerPublicEndpoint(router, db, "/login", authenticateHandler, "POST")
 	registerAuthenticatedEndpoint(router, db, "/validate", validateHandler, "POST")
 	initFeaturesEndpoint(router, db)
 	initLogsEndpoint(router, db)

@@ -50,7 +50,8 @@ func registerEndpoint(
 	handleFunc := func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		if requireAuthentication && authMiddleware.CheckJWT(w, r) != nil {
+		if requireAuthentication && !IsAuthenticated(r) {
+			_, _ = w.Write([]byte("401 - Not authorized"))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
