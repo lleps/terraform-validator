@@ -25,6 +25,8 @@ var (
 	awsSecretAccessKeyFlag = flag.String("aws-secret-access-key", "", "credentials aws_secret_access_key")
 	slackUrlFlagFlag       = flag.String("slack-url", "", "url to report failed validations")
 	panelUrlFlag           = flag.String("panel-url", "", "panel url, for references.")
+	oktaClientIdFlag       = flag.String("okta-client-id", "", "okta client id for authentication")
+	oktaIssuerUrlFlag      = flag.String("okta-issuer-url", "", "okta issuer url")
 	timestampFormat        = time.Stamp
 )
 
@@ -32,9 +34,18 @@ func main() {
 	flag.Parse()
 
 	// Create session
+	log.Printf("Create AWS session...")
 	sess := createSession()
 	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
 	db := initDB(sess, *dynamoPrefixFlag)
+
+	// parse okta credentials
+	oktaClientId := *oktaClientIdFlag
+	oktaIssuerUrl := *oktaIssuerUrlFlag
+	if oktaClientId == "" || oktaIssuerUrl == "" {
+		log.Fatalf("eiher -okta-client-id or -okta-issuer-url flags not given.")
+	}
+	InitOktaLoginCredentials(oktaClientId, oktaIssuerUrl)
 
 	// Spawn monitoring routines
 	log.Printf("Init state monitoring ticker...")

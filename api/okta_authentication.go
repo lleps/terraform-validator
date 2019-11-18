@@ -7,7 +7,21 @@ import (
 	"strings"
 )
 
+var (
+	OktaClientId  = ""
+	OktaIssuerUrl = ""
+)
+
+func InitOktaLoginCredentials(clientId, issuerUrl string) {
+	OktaClientId = clientId
+	OktaIssuerUrl = issuerUrl
+}
+
 func IsAuthenticated(r *http.Request) bool {
+	if OktaClientId == "" || OktaIssuerUrl == "" {
+		panic("okta credentials not initialized. Init them using InitOktaLoginCredentials")
+	}
+
 	authHeader := r.Header.Get("Authorization")
 
 	if authHeader == "" {
@@ -18,9 +32,9 @@ func IsAuthenticated(r *http.Request) bool {
 
 	tv := map[string]string{}
 	tv["aud"] = "api://default"
-	tv["cid"] = "0oa1ut3cyjyVyMJdP357"
+	tv["cid"] = OktaClientId
 	jv := verifier.JwtVerifier{
-		Issuer:           "https://linuxtest.okta.com/oauth2/default",
+		Issuer:           OktaIssuerUrl,
 		ClaimsToValidate: tv,
 	}
 

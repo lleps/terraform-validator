@@ -51,8 +51,8 @@ func registerEndpoint(
 		defer r.Body.Close()
 
 		if requireAuthentication && !IsAuthenticated(r) {
-			_, _ = w.Write([]byte("401 - Not authorized"))
 			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("401 - Not authorized"))
 			return
 		}
 
