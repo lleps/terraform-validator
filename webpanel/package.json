@@ -14,7 +14,8 @@
     "recharts": "^1.7.1",
     "typeface-roboto": "0.0.75",
     "javascript-time-ago": "latest",
-    "js-cookie": "latest"
+    "js-cookie": "latest",
+    "@okta/okta-react": "latest"
   },
   "scripts": {
     "start": "react-scripts start",

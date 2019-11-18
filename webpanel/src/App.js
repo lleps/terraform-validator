@@ -1,6 +1,8 @@
 import React from 'react';
 import './App.css';
-import {BrowserRouter as Router, Redirect, Route} from "react-router-dom";
+import { BrowserRouter, Route, Redirect } from 'react-router-dom';
+import { Security, ImplicitCallback } from '@okta/okta-react';
+import OktaLoginPage from './OktaLoginPage';
 import Navigation from "./Navigation";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
@@ -10,7 +12,9 @@ import {TFStateDialog, TFStatesTable} from "./TFStates";
 import {ForeignResourceDetailsDialog, ForeignResourcesTable} from "./ForeignResources";
 import {makeStyles} from "@material-ui/core";
 import FloatingActionButtons from "./Fab";
-import Login, {getSession, setSessionKey} from "./Login";
+import {getSession, setSessionKey} from "./Login";
+import axios from "axios";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 const useStyles = makeStyles(theme => ({
     paper: {
@@ -20,7 +24,6 @@ const useStyles = makeStyles(theme => ({
         flexDirection: 'column',
     },
 }));
-
 
 function Logs(props) {
     const classes = useStyles();
@@ -180,29 +183,54 @@ function Routes() {
 
 function App() {
     let sess = getSession();
-    if (sess == null) {
-        return <Router>
-            <Route path="/login" render={() =>
-                <Login
-                    onLogin={key => {
-                        setSessionKey(key);
-                        window.location.reload();
-                    }}
-                />
-            }/>
-            <Redirect to="/login"/>
-        </Router>
-    } else {
-        return <AppLogged/>
-    }
-}
+    const [error, setError] = React.useState("");
+    const [config, setConfig] = React.useState(null);
 
-function AppLogged() {
-    return (
-        <Router>
-            <Navigation title={"Terraform Monitor"} content={Routes}/>
-        </Router>
-    );
+    React.useEffect(() => {
+        axios.get("/login-details")
+            .then(res => {
+                setConfig({
+                    issuer: res.data.okta_issuer_url,
+                    redirectUri: window.location.origin + '/implicit/callback',
+                    clientId: res.data.okta_client_id,
+                    pkce: true
+                })
+            })
+            .catch(err => {
+                setError("Can't fetch okta login details. Is the API alive?")
+            });
+    }, []);
+
+    if (error !== "") {
+        return <b>{error}</b>
+    }
+
+    if (!config) {
+        return <CircularProgress/>
+    }
+
+    if (sess == null) {
+        return <BrowserRouter>
+            <Security {...config}>
+                <Route exact path="/" render={() => (<Redirect to="/login"/>)}/>
+                <Route path="/login" render={() =>
+                    <OktaLoginPage
+                        onLogin={key => {
+                            setSessionKey(key);
+                            window.location.reload();
+                        }}
+                    />
+                }/>
+                <Route path='/implicit/callback' component={ImplicitCallback}/>
+            </Security>
+        </BrowserRouter>;
+    } else {
+        return <BrowserRouter>
+            <Security {...config}>
+                <Navigation title={"Terraform Monitor"} content={Routes}/>
+            </Security>
+        </BrowserRouter>
+    }
 }
 
 export default App;

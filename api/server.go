@@ -33,12 +33,6 @@ var (
 func main() {
 	flag.Parse()
 
-	// Create session
-	log.Printf("Create AWS session...")
-	sess := createSession()
-	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
-	db := initDB(sess, *dynamoPrefixFlag)
-
 	// parse okta credentials
 	oktaClientId := *oktaClientIdFlag
 	oktaIssuerUrl := *oktaIssuerUrlFlag
@@ -46,6 +40,12 @@ func main() {
 		log.Fatalf("eiher -okta-client-id or -okta-issuer-url flags not given.")
 	}
 	InitOktaLoginCredentials(oktaClientId, oktaIssuerUrl)
+
+	// Create AWS session
+	log.Printf("Create AWS session...")
+	sess := createSession()
+	log.Printf("Init DynamoDB tables at prefix '%s_*'...", *dynamoPrefixFlag)
+	db := initDB(sess, *dynamoPrefixFlag)
 
 	// Spawn monitoring routines
 	log.Printf("Init state monitoring ticker...")
