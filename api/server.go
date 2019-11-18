@@ -58,6 +58,7 @@ func main() {
 	// Init REST handlers
 	log.Printf("Listening on '%s'...", *listenFlag)
 	router := mux.NewRouter()
+	registerPublicEndpoint(router, db, "/login-details", LoginDetailsHandler, "GET")
 	registerAuthenticatedEndpoint(router, db, "/validate", validateHandler, "POST")
 	initFeaturesEndpoint(router, db)
 	initLogsEndpoint(router, db)
