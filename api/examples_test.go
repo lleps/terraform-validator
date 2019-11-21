@@ -31,7 +31,8 @@ func ExampleSendValidationToSlack() {
 			Id:     "my-tfstate-id",
 			Bucket: "test-bucket",
 			Path:   "/some/path",
-		})
+		},
+		&ValidationLog{})
 	if err != nil {
 		panic(err)
 	}

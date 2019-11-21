@@ -54,7 +54,7 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 				}
 
 				if mSlackHookUrl != "" && logEntry != nil && logEntry.ComplianceResult.FailCount > 0 {
-					err = reportFailedValidationToSlack(mSlackHookUrl, mPanelUrl, obj)
+					err = reportFailedValidationToSlack(mSlackHookUrl, mPanelUrl, obj, logEntry)
 					if err != nil {
 						log.Printf("can't send to slack: %v", err)
 					}
@@ -68,14 +68,14 @@ func initStateChangeMonitoring(sess *session.Session, db *database, frequency ti
 	}()
 }
 
-func reportFailedValidationToSlack(slackUrl string, panelUrl string, state *TFState) error {
+func reportFailedValidationToSlack(slackUrl string, panelUrl string, state *TFState, logEntry *ValidationLog) error {
 	var postBody struct {
 		Text string `json:"text"`
 	}
 
 	postBody.Text = fmt.Sprintf(
 		"Automatic state validation failed for state at %s:%s. See details at %s.",
-		state.Bucket, state.Path, panelUrl+"/logs/"+state.Id)
+		state.Bucket, state.Path, panelUrl+"/logs/"+logEntry.Id)
 
 	marshaled, err := json.Marshal(postBody)
 	if err != nil {
