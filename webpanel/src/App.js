@@ -192,8 +192,7 @@ function App() {
                 setConfig({
                     issuer: res.data.okta_issuer_url,
                     redirectUri: window.location.origin + '/implicit/callback',
-                    clientId: res.data.okta_client_id,
-                    pkce: true
+                    clientId: res.data.okta_client_id
                 })
             })
             .catch(err => {
